@@ -81,7 +81,11 @@ jobs:
           apt_snapshot=(--snapshot 20261122T210000Z
             -o "Dir::Etc::sourcelist=$RUNNER_TEMP/ubuntu-snapshot.sources"
             -o 'Dir::Etc::sourceparts=-')
-          sudo apt-get "${apt_snapshot[@]}" -o APT::Update::Error-Mode=any update
+          set -o pipefail
+          sudo apt-get "${apt_snapshot[@]}" -o APT::Update::Error-Mode=any update | tee "$RUNNER_TEMP/apt-update.log"
+          for suite in noble noble-updates noble-security; do
+            grep -E "https://snapshot[.]ubuntu[.]com/ubuntu/20261122T210000Z/? $suite " "$RUNNER_TEMP/apt-update.log"
+          done
           sudo apt-get "${apt_snapshot[@]}" install -y --allow-downgrades ninja-build pkg-config \
             libx11-dev libxext-dev libxrandr-dev libxi-dev libxcursor-dev \
             libxfixes-dev libxss-dev libxtst-dev libasound2-dev libpulse-dev \
