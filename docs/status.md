@@ -20,7 +20,34 @@ Last updated: 2026-11-22
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 GL context groundwork
+## Latest session: Linux software OpenGL CI
+
+- Added a separate Linux Debug CI step intended to run the existing M1 context
+  smoke and forced-validation cleanup cases on Xvfb and Mesa llvmpipe. It forces
+  SDL X11 and software GL, checks the renderer, and requires an explicit success
+  line for each named test so a skip or unmatched filter cannot pass. The
+  existing dummy-driver CTest runs remain unchanged. The CI-only system package
+  pins and licenses are documented in `third_party/README.md` and ADR-0004.
+- Review found a blocking package issue: Ubuntu's amd64 Noble updates archive
+  reports `libgbm-dev`, `libgl1-mesa-dri` and `libglx-mesa0` version
+  `25.2.8-0ubuntu0.24.04.4` superseded and removed; `.5` is published instead
+  ([libgbm-dev history](https://launchpad.net/ubuntu/noble/amd64/libgbm-dev)).
+  The three pins have been updated together to `.5`; package installation on
+  CI remains unverified. Exact pins can break when Ubuntu retires them;
+  transitive packages and the runner image are not pinned.
+- Workflow YAML and outer/inner shell syntax passed locally. Both named tests
+  passed on the Windows real context through the success-line filter, which also
+  rejected skipped, failed and unmatched dummy-driver cases. The full pipeline
+  could not run on Git Bash because `tee /dev/stderr` failed; the filter was
+  tested without `tee`. `glxinfo` verifies its own renderer, not directly the
+  engine test's renderer. No engine code was changed.
+- **Not yet verified on Linux or GitHub CI:** WSL is not installed and no Docker,
+  Podman, Multipass, Vagrant or libvirt command is available locally. Hosted
+  verification is pending on a dedicated branch. Even a successful llvmpipe
+  run would not verify a physical GPU, real desktop, Wayland,
+  actual VSync, GL clear or performance; M1 remains open.
+
+## Previous session: M1 GL context groundwork
 
 - M1 requires a GL context and VSync control; deferring the context to M2 was
   inconsistent with that sequencing. The platform now optionally requests an
@@ -43,8 +70,9 @@ Last updated: 2026-11-22
   clang-tidy passed. The test override is compiled only when tests are enabled.
 - CI on `742d5ad` passed on Windows and headless Linux (details below). Linux
   used the dummy driver; the real-context and forced post-creation cleanup tests
-  are opt-in and did not run in that job. WSL is not installed locally. Run both
-  opt-in tests on a GL-capable Linux desktop. This does not prove GPU resources
+  are opt-in and did not run in that job. WSL is not installed locally. The new
+  software-GL CI step is not yet verified; run both opt-in tests on a GL-capable
+  Linux desktop as well. This does not prove GPU resources
   are leak-free, actual display synchronization or visible-window behavior. A GL
   clear remains unimplemented because ADR-0003 confines drawing to a rendering
   backend. No M1 gate is closed; no M2 renderer was started. No performance

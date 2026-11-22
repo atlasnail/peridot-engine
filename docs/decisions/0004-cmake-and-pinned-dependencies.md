@@ -15,6 +15,13 @@ CMake is already installed with the Visual Studio C++ workload, is the norm for 
 - Configurations: `debug`, `relwithdebinfo`, `release`, plus `asan` (Linux) and leak-checked MSVC debug.
 - Dependencies pinned by exact version and integrity hash, fetched or vendored via `third_party/` with a `README` recording origin, license and update procedure. No floating branches; updates are explicit commits.
 - Build settings that affect behavior (exceptions, RTTI, float contraction, LTO) are set in presets, not ad hoc.
+- For M1 CI only, use Ubuntu 24.04's version-pinned Xvfb, xauth, Mesa, Mesa
+  utilities and GLVND packages to test SDL's X11/GLX path with software GL.
+  These system tools are not vendored or shipped as engine dependencies; their
+  package versions, upstreams and licenses are recorded in `third_party/README.md`.
+  Ubuntu may retire pinned package versions, so an unavailable pin must be
+  reviewed and updated rather than silently made floating. This check does not
+  replace a real desktop or hardware-driver test.
 - The installed SDK ships a CMake package config so games can `find_package`.
 
 ## Consequences

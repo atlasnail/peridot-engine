@@ -7,7 +7,7 @@ benchmark suites on both platforms.
 | Dependency | Version | License | Used by | Pin |
 | --- | --- | --- | --- | --- |
 | SDL | **3.4.20** | Zlib | `engine/platform` | URL + SHA-256 in `third_party/CMakeLists.txt` |
-| glad (OpenGL loader) | **2.0.8** | MIT (Khronos headers keep their notice) | M2 renderer, via `peri::gl_loader` | Generated output vendored in `third_party/glad/`; generator archive pinned by SHA-256 in its README |
+| glad (OpenGL loader) | **2.0.8** | MIT (Khronos headers keep their notice) | Platform context validation and tests, via `peri::gl_loader` | Generated output vendored in `third_party/glad/`; generator archive pinned by SHA-256 in its README |
 | Manrope variable font | **4.505** | SIL OFL 1.1 | Brand assets only; not linked into engine | Google Fonts commit `b31870aff700ab7a1d74fa0c6887d95beb9e0037`, SHA-256 `3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6` |
 
 ## Manrope 4.505
@@ -41,7 +41,8 @@ benchmark suites on both platforms.
   Python for every build is fragile; the output never changes between
   dependency updates, so it is generated once and committed. See ADR-0010.
 - Details, exact command and regeneration steps: `third_party/glad/README.md`.
-- Nothing links the loader yet; the renderer arrives in M2.
+- The platform layer and tests link the loader for context validation; the
+  renderer arrives in M2 (ADR-0010).
 
 ## Offline builds
 
@@ -77,3 +78,22 @@ engine targets X11 and Wayland for real desktops.
 installs the windowing/audio development headers before configuring, and
 `tools/dev/ci_configure.sh` prints configure errors as annotations so failures
 are readable without admin access to the job logs.
+
+For a separate M1 software-GL check, CI uses these Ubuntu 24.04 packages (see
+ADR-0004). They are CI system tools, not engine-shipped dependencies; the
+workflow pins their named packages, while their transitive OS dependencies and
+runner image remain Ubuntu-managed. Ubuntu may retire package versions; review
+and update the pins together when necessary.
+
+| CI package | Pinned Ubuntu version | Upstream / license / maintenance |
+| --- | --- | --- |
+| `libgl1-mesa-dri`, `libglx-mesa0`, `libgbm-dev` | `25.2.8-0ubuntu0.24.04.5` | [Mesa](https://www.mesa3d.org/): maintained open-source project; core and Gallium MIT, other component licenses vary ([details](https://docs.mesa3d.org/license.html)) |
+| `libgl-dev`, `libglx-dev` | `1.7.0-1build1` | [libglvnd](https://gitlab.freedesktop.org/glvnd/libglvnd): maintained vendor-neutral GL dispatch; MIT-style and component licenses ([details](https://github.com/NVIDIA/libglvnd#licensing)) |
+| `xvfb`, `xserver-common` | `2:21.1.12-1ubuntu1.9` | [X.Org server](https://gitlab.freedesktop.org/xorg/xserver): maintained, predominantly MIT/X11; see [Ubuntu copyright](https://changelogs.ubuntu.com/changelogs/pool/main/x/xorg-server/xorg-server_21.1.12-1ubuntu1.9/copyright) for components |
+| `xauth` | `1:1.1.2-1build1` | [X.Org xauth](https://gitlab.freedesktop.org/xorg/app/xauth): maintained; MIT/X11 ([Ubuntu copyright](https://changelogs.ubuntu.com/changelogs/pool/main/x/xauth/xauth_1.1.2-1build1/copyright)) |
+| `mesa-utils`, `mesa-utils-bin` | `9.0.0-2` | [Mesa demos](https://gitlab.freedesktop.org/mesa/demos): maintained; mixed permissive component licenses ([Ubuntu copyright](https://changelogs.ubuntu.com/changelogs/pool/universe/m/mesa-demos/mesa-demos_9.0.0-2/copyright)) |
+
+The check selects SDL's X11 backend and Mesa llvmpipe under Xvfb. It is separate
+from the dummy-driver CTest run, and it does not verify a physical display,
+GPU driver, real VSync, Wayland or performance gates. Its first CI execution is
+still required to establish whether it works on the hosted runner.

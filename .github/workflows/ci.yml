@@ -58,7 +58,7 @@ jobs:
     name: Linux (GCC)
     runs-on: ubuntu-24.04
     env:
-      # No display in CI. Window tests use SDL's dummy video backend.
+      # Regular window tests use SDL's dummy video backend; the GL step overrides it.
       SDL_VIDEODRIVER: dummy
     steps:
       - uses: actions/checkout@v4
@@ -74,7 +74,12 @@ jobs:
             libx11-dev libxext-dev libxrandr-dev libxi-dev libxcursor-dev \
             libxfixes-dev libxss-dev libxtst-dev libasound2-dev libpulse-dev \
             libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libdecor-0-dev \
-            libdrm-dev libgbm-dev libudev-dev
+            libdrm-dev libgbm-dev=25.2.8-0ubuntu0.24.04.5 libudev-dev \
+            libgl-dev=1.7.0-1build1 libglx-dev=1.7.0-1build1 \
+            libgl1-mesa-dri=25.2.8-0ubuntu0.24.04.5 \
+            libglx-mesa0=25.2.8-0ubuntu0.24.04.5 \
+            xvfb=2:21.1.12-1ubuntu1.9 xserver-common=2:21.1.12-1ubuntu1.9 \
+            xauth=1:1.1.2-1build1 mesa-utils=9.0.0-2 mesa-utils-bin=9.0.0-2
           python -m pip install \
             "clang-format==${LLVM_TOOLS_VERSION}" \
             "clang-tidy==${LLVM_TOOLS_VERSION}"
@@ -90,6 +95,20 @@ jobs:
 
       - name: Test (Debug)
         run: ctest --preset linux-debug
+
+      - name: Test OpenGL (Xvfb + Mesa llvmpipe)
+        env:
+          SDL_VIDEODRIVER: x11
+          PERI_TEST_OPENGL: "1"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          xvfb-run -a -s "-screen 0 1280x720x24" bash -euo pipefail -c '
+            glxinfo -B | tee /dev/stderr | grep -i "OpenGL renderer string:.*llvmpipe"
+            for test in window_opengl_context_smoke window_opengl_validation_failure_cleans_up; do
+              build/linux-debug/bin/peri_platform_tests "$test" | tee /dev/stderr | grep -Fx "ok    $test"
+            done
+          '
 
       - name: Configure (ASan + UBSan)
         run: bash tools/dev/ci_configure.sh linux-asan
