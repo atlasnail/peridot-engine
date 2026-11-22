@@ -11,8 +11,8 @@ If you only read one section, read [Build and run](#build-and-run) and
 
 ## What exists today
 
-A basic game window and loop exist. The Peridot rename has not yet been
-verified on Linux; real Linux desktop and M1 hardware gates remain open:
+A basic game window and loop exist. The Peridot rename passed headless Linux
+CI; real Linux desktop and M1 hardware gates remain open:
 
 | Piece | What it does | Where |
 | --- | --- | --- |

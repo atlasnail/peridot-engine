@@ -2,7 +2,7 @@
 
 This is the source of truth for current implementation and verification.
 
-Last updated: 2026-11-20
+Last updated: 2026-11-22
 
 ## Current position
 
@@ -16,9 +16,9 @@ Last updated: 2026-11-20
   visible-window checks, and a real CPU-time measurement.
 - Version `0.1.0-dev`; implementation: core and SDL3 platform, tests and
   `bench_blank`. No game renderer or audio.
-- The existing remote is `https://github.com/atlasnail/engine.git`. Earlier
-  Linux CI passed before the rename, using SDL's dummy video driver; the rename
-  has not yet been verified on Linux or on a real Linux display or gamepad.
+- The existing remote is `https://github.com/atlasnail/engine.git`. The rename
+  passed Linux CI using SDL's dummy video driver, but has not been verified on
+  a real Linux display or gamepad.
 
 ## Latest session: Peridot Engine rename and brand
 
@@ -32,9 +32,10 @@ Last updated: 2026-11-20
 - `brand/` contains the faceted SVG mark, outlined wordmark variants, palette
   and the pinned, OFL-licensed Manrope font; see ADR-0011. The name and logo
   have not been legally cleared. Windows MSVC Debug configure/build and all
-  three CTest entries passed; formatting passed. SVG files parsed as XML but
-  were not visually reviewed. Linux was not run for this change; prior CI
-  evidence below predates it. No milestone or performance gate is closed.
+  three CTest entries passed locally; formatting passed. SVG files parsed as
+  XML but were not visually reviewed. CI passed on both platforms for the rename
+  as detailed below; Linux was headless. No milestone or performance gate is
+  closed.
 
 ## Latest session: withhold Windows CPU percentiles
 
@@ -194,6 +195,11 @@ Last updated: 2026-11-20
 
 ## Verification
 
+- **CI on `3e9a761` passed** ([run 44768627443](https://github.com/atlasnail/peridot-engine/actions/runs/44768627443)):
+  Linux GCC Debug, ASan+UBSan and Release configure/build/test, formatting and
+  blocking static analysis passed; Windows MSVC Debug and Release
+  configure/build/test and formatting passed. Linux used SDL's dummy video
+  driver; this is not real-desktop, hardware parity or performance-gate evidence.
 - **CI on `980aad1` passed** ([run 44765609894](https://github.com/atlasnail/engine/actions/runs/44765609894)):
   Linux GCC Debug, ASan+UBSan and Release builds and CTest, formatting, and
   blocking clang-tidy passed; Windows MSVC Debug and Release builds, CTest and
@@ -248,9 +254,8 @@ Last updated: 2026-11-20
    the standard library, but it does not flag state that is alive for the whole
    process by design (the harness registries, CRT stdio buffers). The engine's
    tracking allocator still fails on engine allocations that are never released.
-2. Linux verification before the rename was headless only; the renamed code has
-   not been built or tested on Linux. X11/Wayland window behavior, DPI,
-   fullscreen and focus handling on a real desktop are untested.
+2. Linux verification of the rename was headless only. X11/Wayland window
+   behavior, DPI, fullscreen and focus handling on a real desktop are untested.
 3. M1 parity and hardware tests are incomplete: real gamepad, visible window,
    fullscreen, focus, DPI/minimize behavior, Linux display drivers, shutdown.
    Window tests skip when no video driver is available.
@@ -278,8 +283,6 @@ Last updated: 2026-11-20
 
 ## Next steps
 
-- Verify the Peridot rename with Linux build and tests; previous Linux CI
-  predates it.
 - Remaining M1 gates: visible-window checks on both platforms, real gamepad,
   minimized behavior, a real CPU-time measurement, and the GL clear/VSync pass
   through a real context.

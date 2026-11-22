@@ -63,10 +63,10 @@ Target structure; create directories only when a milestone needs them.
 
 ## 5. Build and test commands
 
-Windows Debug is verified with MSVC 19.52 after the Peridot rename. Earlier
-versions also ran in Linux CI (GCC 13, Debug/Release/ASan) and with Clang
-22.1.3 on Windows, but that evidence predates the rename. Linux has not run on
-this local machine; see `docs/status.md` for what is actually verified.
+Windows Debug is verified locally with MSVC 19.52 after the Peridot rename.
+CI also passed on Windows (MSVC Debug/Release) and headless Linux (GCC 13,
+Debug/Release/ASan+UBSan). The Windows Clang 22.1.3 result predates the rename;
+Linux has not run on this local machine. See `docs/status.md` for details.
 
 **Windows, Developer PowerShell for VS 2026:**
 

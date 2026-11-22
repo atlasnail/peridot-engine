@@ -39,10 +39,9 @@ There is **no way to draw a game yet**. No sprites, no textures, no text font,
 no sound. That is the next big chunk of work. Right now the only thing that can
 draw is the debug readout.
 
-Windows is where the work has been done by hand. Earlier Linux GitHub Actions
-builds and tests passed using a fake display driver, but they predate the
-Peridot rename. Nobody has yet opened a window or used a controller on a real
-Linux desktop.
+Windows is where the work has been done by hand. Linux GitHub Actions builds
+and tests passed after the Peridot rename using a fake display driver. Nobody
+has yet opened a window or used a controller on a real Linux desktop.
 
 ## Building it
 
