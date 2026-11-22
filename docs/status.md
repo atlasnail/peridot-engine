@@ -34,8 +34,10 @@ Last updated: 2026-11-22
   ([libgbm-dev history](https://launchpad.net/ubuntu/noble/amd64/libgbm-dev)).
   The three pins were updated together to `.5` and installed in CI run
   [45071444511](https://github.com/atlasnail/peridot-engine/actions/runs/45071444511).
-  Exact pins can break when Ubuntu retires them; transitive packages and the
-  runner image are not pinned.
+  The workflow now resolves its packages from Ubuntu snapshot
+  `20261122T210000Z` instead of moving archives. This revised configuration has
+  not yet been verified in hosted CI. The runner image and already-installed
+  transitive packages are not pinned; snapshot retention is finite.
 - Workflow YAML and outer/inner shell syntax passed locally. Both named tests
   passed on the Windows real context through the success-line filter, which also
   rejected skipped, failed and unmatched dummy-driver cases. The full pipeline
@@ -368,10 +370,11 @@ Last updated: 2026-11-22
    fullscreen, focus, DPI/minimize behavior, Linux display drivers, shutdown.
    Window tests skip when no video driver is available.
 4. M1 now has an opt-in GL context and swap control, but no GL clear backend;
-   no approved roadmap exception is recorded. Driver version/profile was checked
-   on the local Windows context only; Linux, actual VSync and visible rendering
-   need verification. Minimized pause is implemented, but real desktop behavior
-   and the 10-second idle-CPU gate are not verified.
+   no approved roadmap exception is recorded. Version/profile validation passed
+   on Windows and on Linux's software context in CI; the Linux context's reported
+   values were not inspected. GPU-backed Linux contexts, actual VSync and visible
+   rendering remain unverified. Minimized pause is implemented, but real desktop
+   behavior and the 10-second idle-CPU gate are not verified.
 5. Fixed-step input keeps at most 128 pending changes per action and 256 raw
    button changes per pump, then fails explicitly during normal operation.
    Paused pumps instead discard transient edges and reconcile held state.
@@ -397,7 +400,7 @@ Last updated: 2026-11-22
   minimized behavior, a real CPU-time measurement, and a GL clear/VSync pass.
   Decide how to supply the M1 clear within ADR-0003's backend boundary, then
   verify the clear and swap behavior on both systems and context version/profile
-  on Linux.
+  on GPU-backed Linux.
 - Do not start the renderer (M2) or add store SDKs until sequencing is agreed.
 
 ## Gates closed in an earlier session

@@ -69,8 +69,20 @@ jobs:
 
       - name: Install tools and SDL build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build pkg-config \
+          # Isolate Ubuntu sources so exact pins cannot fall back to a live archive.
+          printf '%s\n' \
+            'Types: deb' 'URIs: http://archive.ubuntu.com/ubuntu' \
+            'Suites: noble noble-updates' 'Components: main universe restricted multiverse' \
+            'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' 'Snapshot: enable' '' \
+            'Types: deb' 'URIs: http://security.ubuntu.com/ubuntu' \
+            'Suites: noble-security' 'Components: main universe restricted multiverse' \
+            'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' 'Snapshot: enable' \
+            > "$RUNNER_TEMP/ubuntu-snapshot.sources"
+          apt_snapshot=(--snapshot 20261122T210000Z
+            -o "Dir::Etc::sourcelist=$RUNNER_TEMP/ubuntu-snapshot.sources"
+            -o 'Dir::Etc::sourceparts=-')
+          sudo apt-get "${apt_snapshot[@]}" -o APT::Update::Error-Mode=any update
+          sudo apt-get "${apt_snapshot[@]}" install -y --allow-downgrades ninja-build pkg-config \
             libx11-dev libxext-dev libxrandr-dev libxi-dev libxcursor-dev \
             libxfixes-dev libxss-dev libxtst-dev libasound2-dev libpulse-dev \
             libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libdecor-0-dev \

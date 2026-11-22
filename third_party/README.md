@@ -81,9 +81,14 @@ are readable without admin access to the job logs.
 
 For a separate M1 software-GL check, CI uses these Ubuntu 24.04 packages (see
 ADR-0004). They are CI system tools, not engine-shipped dependencies; the
-workflow pins their named packages, while their transitive OS dependencies and
-runner image remain Ubuntu-managed. Ubuntu may retire package versions; review
-and update the pins together when necessary.
+workflow pins their named packages against Ubuntu snapshot `20261122T210000Z`.
+APT uses only snapshot-enabled Noble, Noble updates and Noble security sources
+for that install; repository signatures are still verified. The workflow allows
+package downgrades on the disposable hosted runner, where newer system packages
+may already be installed. The runner image and already-installed transitive
+packages are not pinned, so the whole environment is not reproducible. Ubuntu
+intends to retain snapshots for at least two years; review and update the
+snapshot and exact pins together before expiration or for security updates.
 
 | CI package | Pinned Ubuntu version | Upstream / license / maintenance |
 | --- | --- | --- |

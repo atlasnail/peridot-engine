@@ -19,9 +19,11 @@ CMake is already installed with the Visual Studio C++ workload, is the norm for 
   utilities and GLVND packages to test SDL's X11/GLX path with software GL.
   These system tools are not vendored or shipped as engine dependencies; their
   package versions, upstreams and licenses are recorded in `third_party/README.md`.
-  Ubuntu may retire pinned package versions, so an unavailable pin must be
-  reviewed and updated rather than silently made floating. This check does not
-  replace a real desktop or hardware-driver test.
+  Resolve CI packages against an isolated, dated Ubuntu archive snapshot rather
+  than the moving Ubuntu archives. Record the snapshot ID with the pins and
+  update them together in a reviewed change. The hosted image and already
+  installed system packages are not pinned; Ubuntu's snapshot retention is
+  finite. This check does not replace a real desktop or hardware-driver test.
 - The installed SDK ships a CMake package config so games can `find_package`.
 
 ## Consequences
