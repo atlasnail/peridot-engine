@@ -34,9 +34,12 @@ Last updated: 2026-11-22
   ([libgbm-dev history](https://launchpad.net/ubuntu/noble/amd64/libgbm-dev)).
   The three pins were updated together to `.5` and installed in CI run
   [45071444511](https://github.com/atlasnail/peridot-engine/actions/runs/45071444511).
-  The workflow now resolves its packages from Ubuntu snapshot
-  `20261122T210000Z` instead of moving archives. This revised configuration has
-  not yet been verified in hosted CI. The runner image and already-installed
+  The workflow now resolves packages from Ubuntu snapshot `20261122T210000Z`
+  instead of moving archives, with a guard requiring snapshot URLs for all three
+  Ubuntu suites. CI on `077b718` passed the guard, install and software-GL step
+  ([run 45072427353](https://github.com/atlasnail/peridot-engine/actions/runs/45072427353)).
+  Individual logs were not accessible for inspection; success follows from the
+  step status and its fail-closed commands. The runner image and already-installed
   transitive packages are not pinned; snapshot retention is finite.
 - Workflow YAML and outer/inner shell syntax passed locally. Both named tests
   passed on the Windows real context through the success-line filter, which also
@@ -287,6 +290,13 @@ Last updated: 2026-11-22
 
 ## Verification
 
+- **CI on `077b718` passed** ([run 45072427353](https://github.com/atlasnail/peridot-engine/actions/runs/45072427353)):
+  snapshot URL guard and package install passed, as did Linux Debug,
+  ASan+UBSan and Release builds/tests, formatting, blocking static analysis and
+  the separate Debug software-GL check. Windows MSVC Debug/Release builds/tests
+  and formatting passed. Individual log lines were not available for inspection;
+  the software-GL step's success requires both named cases and the `glxinfo`
+  llvmpipe check. Linux GPU-backed desktop and performance gates remain open.
 - **CI on `db39b9a` passed** ([run 45071444511](https://github.com/atlasnail/peridot-engine/actions/runs/45071444511)):
   Linux GCC Debug, ASan+UBSan and Release build/test, formatting and blocking
   static analysis passed; Windows MSVC Debug/Release build/test and formatting
