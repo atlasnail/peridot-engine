@@ -281,22 +281,34 @@ if (actions.bind("jump", peri::ActionBinding::key(peri::Key::space)).is_error() 
 // In a callback: actions.down("jump"), actions.pressed("jump"), etc.
 ```
 
-There are at most 32 actions and 8 bindings per action; names are copied and are
-at most 63 bytes. Buttons are combined with OR, so an action only releases when
-every bound button is up.
+The current mapping is an in-memory startup configuration, not a file format:
+
+| Part | Current contract |
+| --- | --- |
+| Action name | Nonempty, at most 63 bytes, no embedded NUL; copied by the map |
+| Binding | One engine `Key`, `MouseButton` or `GamepadButton`; duplicate bindings for the same action are rejected |
+| Limits | At most 32 actions and 8 bindings per action; `bind` returns an error for invalid values or exhausted capacity |
+| Combined state | Buttons are combined with OR; the action releases only when every binding is up |
+
+Bind before `App::run` and check each result. There is no built-in parser or
+persistent mapping format; a game may construct these bindings from its own
+data, but saved/remappable controls remain unimplemented.
 
 `App` records each button change in the order it happened, keeps those changes
 until the game uses them, and hands one change per action to each fixed update.
 That fixes two old bugs: a quick tap was lost when a frame ran no fixed update,
 and the same press was seen again by every fixed update in a frame. Two quick
 taps now produce two presses and two releases, in order. The queues are fixed
-size; if input arrives far faster than it is consumed, `run` stops with an
-error rather than quietly throwing events away.
+size: a normal pump can record 256 raw transitions, and each action can queue
+128 state changes. On overflow `run` stops with an error rather than quietly
+throwing events away. During a minimized or zero-pixel pause, transient input
+is discarded and actions reconcile to the latest held state on restore. A dropped
+fixed step does not consume an action edge; the queue is not a replay log.
 
 Edges are only valid during the fixed update that receives them. The raw
-`App::input()` state is still frame-scoped and is meant for drawing, not for
-gameplay decisions. Axis bindings, text input and saved/remappable controls are
-not implemented yet.
+`App::input()` state is frame-scoped; mouse movement and wheel deltas are not
+queued for fixed steps. Axis bindings, text input and saved/remappable controls
+are not implemented yet.
 
 To enable file logging, include `peri/platform/file_log.hpp`, call
 `FileLog::open("peri.log", 1024 * 1024, 3)`, check the result, then install

@@ -20,14 +20,21 @@ Last updated: 2026-11-22
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 file-system path safety
+## Latest session: M1 action-mapping documentation
+
+- Expanded the existing guide with the actual in-memory action binding contract,
+  capacity and error behavior, fixed-step delivery and pause limitations. No
+  saved mapping format or input behavior was added; the M1 input and hardware
+  gates remain open.
+
+## Previous session: M1 file-system path safety
 
 - File operations now reject embedded NUL bytes in paths before accessing the
   filesystem, preventing truncated-path reads, overwrites or atomic-write cleanup.
   `exists` returns false for such paths. A regression test first reproduced the
-  read bug. Windows MSVC Debug build, platform CTest and formatting passed. Linux
-  CI for this change and real-desktop, hardware and performance M1 gates remain
-  open.
+  read bug. Windows MSVC Debug build, platform CTest and formatting passed locally;
+  CI passed on both platforms as recorded below. Real-desktop, hardware and
+  performance M1 gates remain open.
 
 ## Previous session: brand review and M1 focus-loss check
 
@@ -216,6 +223,11 @@ Last updated: 2026-11-22
 
 ## Verification
 
+- **CI on `c507a18` passed** ([run 45068658429](https://github.com/atlasnail/peridot-engine/actions/runs/45068658429)):
+  Windows MSVC formatting and Debug/Release configure, build and test passed.
+  Linux GCC formatting, Debug/ASan+UBSan/Release configure, build and test, and
+  blocking static analysis passed. Linux used SDL's dummy video driver; this is
+  not real-desktop, controller, hardware parity or performance-gate evidence.
 - **CI on `3e9a761` passed** ([run 44768627443](https://github.com/atlasnail/peridot-engine/actions/runs/44768627443)):
   Linux GCC Debug, ASan+UBSan and Release configure/build/test, formatting and
   blocking static analysis passed; Windows MSVC Debug and Release
