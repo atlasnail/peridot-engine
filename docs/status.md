@@ -11,16 +11,45 @@ Last updated: 2026-11-22
   leak check now fails the test run instead of being skipped. The only caveat is
   what that check measures; see the limitation list.
 - **M1 is in progress:** SDL now has an explicit, reference-counted lifecycle
-  (`peri::SdlSession`), so shutdown is deterministic. Window, input, loop and
-  file-system work is done; the remaining M1 gates are the hardware and
-  visible-window checks, and a real CPU-time measurement.
+  (`peri::SdlSession`), so shutdown is deterministic. The opt-in GL context
+  and swap-control groundwork exists, but clear, desktop and hardware checks,
+  and a real CPU-time measurement remain open.
 - Version `0.1.0-dev`; implementation: core and SDL3 platform, tests and
   `bench_blank`. No game renderer or audio.
 - The existing remote is `https://github.com/atlasnail/engine.git`. The rename
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 action-mapping documentation
+## Latest session: M1 GL context groundwork
+
+- M1 requires a GL context and VSync control; deferring the context to M2 was
+  inconsistent with that sequencing. The platform now optionally requests an
+  SDL GL 3.3 core context, checks and logs the driver's actual version/profile,
+  owns its lifetime and supports runtime swap-interval requests, queries and
+  swaps. Non-GL windows remain the default. Unsupported initial VSync requests
+  warn without blocking creation; runtime failures are returned. SDL's dummy
+  driver explicitly reports GL unavailable. ADR-0003 records the narrow
+  context-validation exception to the no-platform-GL-call rule.
+- Review exposed `make_gl_current()` so a caller can select the right context
+  before drawing, not just when swapping. Windows MSVC Debug opt-in hidden-window
+  smoke test queried the driver through the pinned glad loader: GL 3.3, core
+  profile (mask `0x1`). It exercised two contexts, explicit and swap-triggered
+  switching, destruction of a non-current window without disturbing the current
+  context, and destruction of the current window. The test passed with
+  `PERI_TEST_OPENGL=1 build/windows-debug/bin/peri_platform_tests.exe window_opengl_context_smoke`.
+  A test-only profile override forces rejection after a real context is created;
+  it checked window cleanup, no current context and successful recovery. The
+  Windows platform CTest, dummy-driver unavailable path, formatting and local
+  clang-tidy passed. The test override is compiled only when tests are enabled.
+- This does not prove GPU resources are leak-free, actual display synchronization
+  or visible-window behavior. Linux build, tests and real-driver behavior remain
+  unverified for these changes: WSL is not installed on this machine. Run CI
+  headlessly and the opt-in smoke test on a GL-capable Linux desktop. A GL clear
+  remains unimplemented because ADR-0003 confines drawing to a rendering backend.
+  No M1 gate is closed; no M2 renderer was started. No performance benchmark was
+  run for this opt-in context path.
+
+## Previous session: M1 action-mapping documentation
 
 - Expanded the existing guide with the actual in-memory action binding contract,
   capacity and error behavior, fixed-step delivery and pause limitations. No
@@ -292,9 +321,11 @@ Last updated: 2026-11-22
 3. M1 parity and hardware tests are incomplete: real gamepad, visible window,
    fullscreen, focus, DPI/minimize behavior, Linux display drivers, shutdown.
    Window tests skip when no video driver is available.
-4. M1's GL context, clear and VSync need the later renderer; no approved
-   roadmap exception is recorded. Minimized-window pause is implemented but
-   real desktop behavior and the 10-second idle-CPU gate are not verified.
+4. M1 now has an opt-in GL context and swap control, but no GL clear backend;
+   no approved roadmap exception is recorded. Driver version/profile was checked
+   on the local Windows context only; Linux, actual VSync and visible rendering
+   need verification. Minimized pause is implemented, but real desktop behavior
+   and the 10-second idle-CPU gate are not verified.
 5. Fixed-step input keeps at most 128 pending changes per action and 256 raw
    button changes per pump, then fails explicitly during normal operation.
    Paused pumps instead discard transient edges and reconcile held state.
@@ -317,8 +348,10 @@ Last updated: 2026-11-22
 ## Next steps
 
 - Remaining M1 gates: visible-window checks on both platforms, real gamepad,
-  minimized behavior, a real CPU-time measurement, and the GL clear/VSync pass
-  through a real context.
+  minimized behavior, a real CPU-time measurement, and a GL clear/VSync pass.
+  Decide how to supply the M1 clear within ADR-0003's backend boundary, then
+  verify the clear and swap behavior on both systems and context version/profile
+  on Linux.
 - Do not start the renderer (M2) or add store SDKs until sequencing is agreed.
 
 ## Gates closed in an earlier session

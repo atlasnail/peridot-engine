@@ -197,9 +197,17 @@ What is actually true today, as opposed to intended:
   session. `App` holds a session, so nothing above the platform layer has to
   think about SDL's lifetime beyond not outliving its own App.
 - The OpenGL loader is pinned as glad 2.0.8, GL 3.3 core with no extensions
-  (ADR-0010). It builds as `peri::gl_loader`; no engine target links it yet.
-- The OpenGL context is **not** created yet. It arrives with the M2 renderer,
-  because window tests must run headless.
+  (ADR-0010). The platform layer and tests link it to query actual context
+  properties. Its function table is process-global; a rendering backend must
+  load functions for its current context and after context changes.
+- An opt-in `WindowConfig::opengl` requests an SDL GL 3.3 core context; the
+  window owns and destroys it and rejects an unqueryable, pre-3.3 or non-core
+  context. `make_gl_current` selects it before drawing; `set_vsync`,
+  `swap_interval` and `swap_buffers` also make it current. Initial swap control
+  is best-effort; errors from runtime requests are returned. Ordinary windows
+  remain headless-compatible. No clear or rendering operation exists yet;
+  ADR-0003 reserves these for a backend. Linux context version and desktop
+  behavior need further checks.
 - `app` runs fixed updates with an interpolation alpha, an optional FPS limiter
   and an optional CSV frame log. It is internal API until the public surface is
   defined at M2.

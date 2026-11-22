@@ -35,10 +35,11 @@ the latest specification, so the output depends only on the pinned version.
 
 ## Usage
 
-`eng::gl_loader` is a static library with `glad/gl.h` on the include path. It is
-not linked by anything yet: the renderer arrives in M2 (ADR-0003). When it does,
-it calls `gladLoadGL(SDL_GL_GetProcAddress)` once after the context is current,
-then uses the generated functions directly.
+`peri::gl_loader` is a static library with `glad/gl.h` on the include path. The
+M1 platform layer and tests use it to query actual context properties. The
+generated function table is process-global, so a rendering backend must load GL
+functions for the current context before use and after changing contexts
+(ADR-0003 and ADR-0010).
 
 ## Updating
 

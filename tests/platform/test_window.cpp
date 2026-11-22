@@ -1,12 +1,15 @@
 #include "framework.hpp"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <utility>
 
 #include <SDL3/SDL.h>
+#include <glad/gl.h>
 
+#include "../../engine/platform/src/sdl_internal.hpp"
 #include "peri/platform/window.hpp"
 
 namespace {
@@ -39,6 +42,161 @@ TEST_CASE(window_rejects_invalid_size) {
     const peri::Result<std::unique_ptr<peri::Window>> window = peri::Window::create(config);
     CHECK(window.is_error());
     CHECK(window.error().code == peri::ErrorCode::invalid_argument);
+}
+
+TEST_CASE(window_gl_operations_require_an_opengl_window) {
+    peri::WindowConfig config;
+    config.hidden = true;
+    auto result = peri::Window::create(config);
+    REQUIRE(result.is_ok());
+    auto window = std::move(result.value());
+    const auto current = window->make_gl_current();
+    REQUIRE(current.is_error());
+    CHECK(current.error().code == peri::ErrorCode::unsupported);
+    const auto set = window->set_vsync(false);
+    REQUIRE(set.is_error());
+    CHECK(set.error().code == peri::ErrorCode::unsupported);
+    const auto interval = window->swap_interval();
+    REQUIRE(interval.is_error());
+    CHECK(interval.error().code == peri::ErrorCode::unsupported);
+    const auto swap = window->swap_buffers();
+    REQUIRE(swap.is_error());
+    CHECK(swap.error().code == peri::ErrorCode::unsupported);
+}
+
+TEST_CASE(window_opengl_dummy_reports_unavailable) {
+    if (!using_dummy_driver()) {
+        SKIP_TEST("requires SDL's dummy video driver");
+    }
+    peri::WindowConfig config;
+    config.hidden = true;
+    config.opengl = true;
+    const auto result = peri::Window::create(config);
+    CHECK(result.is_error());
+}
+
+TEST_CASE(window_opengl_validation_failure_cleans_up) {
+    const char* requested = SDL_getenv("PERI_TEST_OPENGL");
+    if (requested == nullptr || std::strcmp(requested, "1") != 0) {
+        SKIP_TEST("set PERI_TEST_OPENGL=1 on a GL-capable desktop");
+    }
+    peri::WindowConfig config;
+    config.hidden = true;
+    config.opengl = true;
+    auto existing_result = peri::Window::create(config);
+    REQUIRE(existing_result.is_ok());
+    auto existing = std::move(existing_result.value());
+    auto* native = static_cast<SDL_Window*>(existing->native_handle());
+    const SDL_GLContext existing_context = SDL_GL_GetCurrentContext();
+    REQUIRE(existing_context != nullptr);
+    int before = 0;
+    SDL_Window** windows = SDL_GetWindows(&before);
+    REQUIRE(windows != nullptr);
+    SDL_free(windows);
+
+    // Force validation to reject a successfully created context. Restore the
+    // real profile before checking results, even if a check fails.
+    peri::platform::detail::set_test_gl_profile_override(0);
+    const auto rejected = peri::Window::create(config);
+    peri::platform::detail::set_test_gl_profile_override(-1);
+    REQUIRE(rejected.is_error());
+    CHECK(rejected.error().code == peri::ErrorCode::unsupported);
+    int after = 0;
+    windows = SDL_GetWindows(&after);
+    REQUIRE(windows != nullptr);
+    SDL_free(windows);
+    CHECK(after == before);
+    CHECK(SDL_GL_GetCurrentContext() == nullptr);
+    CHECK(SDL_GL_GetCurrentWindow() == nullptr);
+    REQUIRE(existing->make_gl_current().is_ok());
+    CHECK(SDL_GL_GetCurrentContext() == existing_context);
+    CHECK(SDL_GL_GetCurrentWindow() == native);
+    auto recovery = peri::Window::create(config);
+    REQUIRE(recovery.is_ok());
+}
+
+TEST_CASE(window_opengl_context_smoke) {
+    const char* requested = SDL_getenv("PERI_TEST_OPENGL");
+    if (requested == nullptr || std::strcmp(requested, "1") != 0) {
+        SKIP_TEST("set PERI_TEST_OPENGL=1 on a GL-capable desktop");
+    }
+    peri::WindowConfig config;
+    config.hidden = true;
+    config.opengl = true;
+    config.vsync = false;
+    auto result = peri::Window::create(config);
+    REQUIRE(result.is_ok());
+    auto window = std::move(result.value());
+    auto* native = static_cast<SDL_Window*>(window->native_handle());
+    REQUIRE((SDL_GetWindowFlags(native) & SDL_WINDOW_OPENGL) != 0);
+    REQUIRE(SDL_GL_GetCurrentContext() != nullptr);
+    CHECK(SDL_GL_GetCurrentWindow() == native);
+    const SDL_GLContext first_context = SDL_GL_GetCurrentContext();
+    const SDL_WindowID first_id = SDL_GetWindowID(native);
+    REQUIRE(first_id != 0);
+
+    // SDL_GL_GetAttribute reports requested context fields in SDL 3.4.20;
+    // query the current driver instead using the pinned loader.
+    REQUIRE(gladLoadGL(SDL_GL_GetProcAddress) != 0);
+    int major = 0;
+    int minor = 0;
+    int profile = 0;
+    glGetIntegerv(GL_MAJOR_VERSION, &major);
+    glGetIntegerv(GL_MINOR_VERSION, &minor);
+    glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &profile);
+    REQUIRE(glGetError() == GL_NO_ERROR);
+    std::printf("OpenGL driver context: %d.%d, profile mask 0x%x\n", major, minor,
+                static_cast<unsigned>(profile));
+    CHECK(major > 3 || (major == 3 && minor >= 3));
+    CHECK((profile & GL_CONTEXT_CORE_PROFILE_BIT) != 0);
+
+    // Check what the driver accepted where swap-control is available. A
+    // driver's refusal is allowed, but it must be returned to the caller.
+    const auto off = window->set_vsync(false);
+    if (off.is_ok()) {
+        const auto interval = window->swap_interval();
+        REQUIRE(interval.is_ok());
+        CHECK(interval.value() == 0);
+    } else {
+        CHECK(off.error().code == peri::ErrorCode::unsupported);
+    }
+    const auto on = window->set_vsync(true);
+    if (on.is_ok()) {
+        const auto interval = window->swap_interval();
+        REQUIRE(interval.is_ok());
+        CHECK(interval.value() == 1);
+    } else {
+        CHECK(on.error().code == peri::ErrorCode::unsupported);
+    }
+    CHECK(window->swap_buffers().is_ok());
+
+    auto second_result = peri::Window::create(config);
+    REQUIRE(second_result.is_ok());
+    auto second = std::move(second_result.value());
+    auto* second_native = static_cast<SDL_Window*>(second->native_handle());
+    const SDL_WindowID second_id = SDL_GetWindowID(second_native);
+    const SDL_GLContext second_context = SDL_GL_GetCurrentContext();
+    REQUIRE(second_id != 0);
+    REQUIRE(second_context != nullptr);
+    CHECK(second_context != first_context);
+    CHECK(SDL_GL_GetCurrentWindow() == second_native);
+
+    REQUIRE(window->make_gl_current().is_ok());
+    CHECK(SDL_GL_GetCurrentContext() == first_context);
+    CHECK(SDL_GL_GetCurrentWindow() == native);
+    REQUIRE(second->swap_buffers().is_ok());
+    CHECK(SDL_GL_GetCurrentContext() == second_context);
+    CHECK(SDL_GL_GetCurrentWindow() == second_native);
+
+    // Destroying a non-current context must leave the other one current.
+    window.reset();
+    CHECK(SDL_GetWindowFromID(first_id) == nullptr);
+    CHECK(SDL_GL_GetCurrentContext() == second_context);
+    CHECK(SDL_GL_GetCurrentWindow() == second_native);
+    second.reset();
+    CHECK(SDL_GetWindowFromID(second_id) == nullptr);
+    CHECK(SDL_GL_GetCurrentContext() == nullptr);
+    CHECK(SDL_GL_GetCurrentWindow() == nullptr);
 }
 
 TEST_CASE(window_focus_loss_releases_keyboard_and_mouse_actions) {

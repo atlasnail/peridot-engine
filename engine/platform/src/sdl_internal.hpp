@@ -10,4 +10,10 @@ namespace peri::platform::detail {
 // those handles must not outlive the library's own shutdown.
 void shutdown_devices() noexcept;
 
+#if defined(PERI_PLATFORM_TEST_HOOKS)
+// Override the profile reported by a newly created GL context for failure tests;
+// -1 restores the real driver value. Main-thread only.
+void set_test_gl_profile_override(int profile) noexcept;
+#endif
+
 }  // namespace peri::platform::detail

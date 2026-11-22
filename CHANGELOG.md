@@ -9,6 +9,10 @@ releases may contain breaking changes, and they are always described below.
 
 ### Added
 
+- Opt-in platform GL 3.3 core context ownership, actual version/profile
+  validation, explicit context selection and swap-interval control. Unsupported
+  initial VSync requests are logged and runtime failures are returned; non-GL
+  windows remain the default. No clear or renderer is added.
 - Peridot Engine brand kit: faceted line-art logo and outlined wordmarks, palette,
   usage guidance and Manrope 4.505 under the SIL OFL 1.1; see `brand/`.
 - `peri::SdlSession`: an explicit, reference-counted SDL lifecycle in
@@ -83,8 +87,8 @@ releases may contain breaking changes, and they are always described below.
 
 ### Notes
 
-- OpenGL context creation moved to M2 with the renderer so headless window tests
-  do not require a GPU.
+- GL context creation is opt-in in M1; non-GL headless window tests do not
+  require a GPU. Clearing and rendering remain unimplemented.
 - Input queues are fixed size (256 raw button changes per pump, 128 pending
   changes per action) and stop the loop with an error on overflow rather than
   dropping events.

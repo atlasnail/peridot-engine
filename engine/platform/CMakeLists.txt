@@ -22,7 +22,11 @@ target_include_directories(peri_platform
 
 target_link_libraries(peri_platform
     PUBLIC peri::core
-    PRIVATE SDL3::SDL3-static
+    PRIVATE SDL3::SDL3-static peri::gl_loader
 )
+
+if(PERI_BUILD_TESTS)
+    target_compile_definitions(peri_platform PRIVATE PERI_PLATFORM_TEST_HOOKS=1)
+endif()
 
 peri_apply_warnings(peri_platform)

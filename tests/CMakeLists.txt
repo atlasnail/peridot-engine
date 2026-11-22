@@ -29,8 +29,9 @@ add_executable(peri_platform_tests
     platform/test_window.cpp
 )
 
-target_link_libraries(peri_platform_tests PRIVATE peri::platform SDL3::SDL3-static)
+target_link_libraries(peri_platform_tests PRIVATE peri::platform SDL3::SDL3-static peri::gl_loader)
 target_include_directories(peri_platform_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(peri_platform_tests PRIVATE PERI_PLATFORM_TEST_HOOKS=1)
 
 peri_apply_warnings(peri_platform_tests)
 

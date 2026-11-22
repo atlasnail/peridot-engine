@@ -4,6 +4,7 @@
 #include <array>
 
 #include <SDL3/SDL.h>
+#include <glad/gl.h>
 
 #include "input_access.hpp"
 #include "peri/core/log.hpp"
@@ -15,6 +16,41 @@ namespace {
 
 SDL_Gamepad* g_gamepad = nullptr;
 SDL_JoystickID g_gamepad_id = 0;
+#if defined(PERI_PLATFORM_TEST_HOOKS)
+int g_test_gl_profile_override = -1;
+#endif
+
+Status validate_gl_context() {
+    // SDL_GL_GetAttribute returns requested version/profile in SDL 3.4.20;
+    // ask the current GL driver instead.
+    if (gladLoadGL(SDL_GL_GetProcAddress) == 0 || glad_glGetIntegerv == nullptr ||
+        glad_glGetError == nullptr) {
+        PERI_LOG_ERROR("platform", "could not load OpenGL context query functions");
+        return Status::failure(ErrorCode::unsupported, "could not query OpenGL context");
+    }
+    int major = 0;
+    int minor = 0;
+    int profile = 0;
+    glGetIntegerv(GL_MAJOR_VERSION, &major);
+    glGetIntegerv(GL_MINOR_VERSION, &minor);
+    glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &profile);
+    if (glGetError() != GL_NO_ERROR) {
+        PERI_LOG_ERROR("platform", "could not query actual OpenGL context properties");
+        return Status::failure(ErrorCode::unsupported, "could not query OpenGL context");
+    }
+    PERI_LOG_INFO("platform", "actual OpenGL context: %d.%d, profile mask 0x%x", major, minor,
+                  static_cast<unsigned>(profile));
+#if defined(PERI_PLATFORM_TEST_HOOKS)
+    if (g_test_gl_profile_override >= 0) {
+        profile = g_test_gl_profile_override;
+    }
+#endif
+    if (major < 3 || (major == 3 && minor < 3) || (profile & GL_CONTEXT_CORE_PROFILE_BIT) == 0) {
+        PERI_LOG_ERROR("platform", "OpenGL 3.3 core context required");
+        return Status::failure(ErrorCode::unsupported, "OpenGL 3.3 core context required");
+    }
+    return Status::ok();
+}
 
 SDL_Scancode to_sdl(Key key) noexcept {
     switch (key) {
@@ -297,6 +333,12 @@ void sync_gamepad(InputState& input) noexcept {
 
 namespace platform::detail {
 
+#if defined(PERI_PLATFORM_TEST_HOOKS)
+void set_test_gl_profile_override(int profile) noexcept {
+    g_test_gl_profile_override = profile;
+}
+#endif
+
 void shutdown_devices() noexcept {
     if (g_gamepad == nullptr) {
         return;
@@ -310,10 +352,19 @@ void shutdown_devices() noexcept {
 
 struct Window::Impl {
     SDL_Window* handle = nullptr;
+    SDL_GLContext gl_context = nullptr;
     bool close_requested = false;
     bool minimized = false;
     bool zero_pixel_size = false;
-    bool vsync = true;
+
+    ~Impl() {
+        if (gl_context != nullptr && !SDL_GL_DestroyContext(gl_context)) {
+            PERI_LOG_ERROR("platform", "could not destroy OpenGL context: %s", SDL_GetError());
+        }
+        if (handle != nullptr) {
+            SDL_DestroyWindow(handle);
+        }
+    }
 };
 
 Result<std::unique_ptr<Window>> Window::create(const WindowConfig& config) {
@@ -327,6 +378,17 @@ Result<std::unique_ptr<Window>> Window::create(const WindowConfig& config) {
     }
 
     SDL_WindowFlags flags = 0;
+    if (config.opengl) {
+        SDL_GL_ResetAttributes();
+        if (!SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3) ||
+            !SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3) ||
+            !SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE) ||
+            !SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1)) {
+            PERI_LOG_ERROR("platform", "could not set OpenGL attributes: %s", SDL_GetError());
+            return Error{ErrorCode::internal_error, "could not set OpenGL attributes"};
+        }
+        flags |= SDL_WINDOW_OPENGL;
+    }
     if (config.resizable) {
         flags |= SDL_WINDOW_RESIZABLE;
     }
@@ -337,27 +399,37 @@ Result<std::unique_ptr<Window>> Window::create(const WindowConfig& config) {
         flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
     }
 
+    // Allocate the owner before acquiring native resources so allocation failure
+    // cannot leak a window or context.
+    auto impl = std::make_unique<Impl>();
     SDL_Window* handle = SDL_CreateWindow(config.title, config.width, config.height, flags);
     if (handle == nullptr) {
         PERI_LOG_ERROR("platform", "SDL_CreateWindow failed: %s", SDL_GetError());
         return Error{ErrorCode::internal_error, "could not create window"};
     }
 
-    auto impl = std::make_unique<Impl>();
     impl->handle = handle;
-    impl->vsync = config.vsync;
+    if (config.opengl) {
+        impl->gl_context = SDL_GL_CreateContext(handle);
+        if (impl->gl_context == nullptr) {
+            PERI_LOG_ERROR("platform", "SDL_GL_CreateContext failed: %s", SDL_GetError());
+            return Error{ErrorCode::internal_error, "could not create OpenGL context"};
+        }
+        const Status validation = validate_gl_context();
+        if (validation.is_error()) {
+            return validation.error();
+        }
+        if (!SDL_GL_SetSwapInterval(config.vsync ? 1 : 0)) {
+            PERI_LOG_WARN("platform", "initial swap interval unavailable: %s", SDL_GetError());
+        }
+    }
 
     return std::unique_ptr<Window>(new Window(std::move(impl)));
 }
 
 Window::Window(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl)) {}
 
-Window::~Window() {
-    if (impl_ != nullptr && impl_->handle != nullptr) {
-        SDL_DestroyWindow(impl_->handle);
-        impl_->handle = nullptr;
-    }
-}
+Window::~Window() = default;
 
 void Window::pump_events(InputState& input) {
     platform::detail::InputAccess::begin_frame(input);
@@ -474,6 +546,54 @@ void Window::toggle_fullscreen() {
     if (!SDL_SetWindowFullscreen(impl_->handle, !is_fullscreen())) {
         PERI_LOG_WARN("platform", "could not toggle fullscreen: %s", SDL_GetError());
     }
+}
+
+Status Window::make_gl_current() {
+    if (impl_->gl_context == nullptr) {
+        return Status::failure(ErrorCode::unsupported, "window has no OpenGL context");
+    }
+    if (!SDL_GL_MakeCurrent(impl_->handle, impl_->gl_context)) {
+        PERI_LOG_ERROR("platform", "could not activate OpenGL context: %s", SDL_GetError());
+        return Status::failure(ErrorCode::internal_error, "could not activate OpenGL context");
+    }
+    return Status::ok();
+}
+
+Status Window::set_vsync(bool enabled) {
+    const Status current = make_gl_current();
+    if (current.is_error()) {
+        return current;
+    }
+    if (!SDL_GL_SetSwapInterval(enabled ? 1 : 0)) {
+        PERI_LOG_WARN("platform", "could not set swap interval: %s", SDL_GetError());
+        return Status::failure(ErrorCode::unsupported, "could not set swap interval");
+    }
+    return Status::ok();
+}
+
+Result<int> Window::swap_interval() {
+    const Status current = make_gl_current();
+    if (current.is_error()) {
+        return current.error();
+    }
+    int interval = 0;
+    if (!SDL_GL_GetSwapInterval(&interval)) {
+        PERI_LOG_WARN("platform", "could not query swap interval: %s", SDL_GetError());
+        return Error{ErrorCode::unsupported, "could not query swap interval"};
+    }
+    return interval;
+}
+
+Status Window::swap_buffers() {
+    const Status current = make_gl_current();
+    if (current.is_error()) {
+        return current;
+    }
+    if (!SDL_GL_SwapWindow(impl_->handle)) {
+        PERI_LOG_ERROR("platform", "could not swap OpenGL buffers: %s", SDL_GetError());
+        return Status::failure(ErrorCode::internal_error, "could not swap OpenGL buffers");
+    }
+    return Status::ok();
 }
 
 IVec2 Window::size_pixels() const noexcept {

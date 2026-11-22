@@ -14,7 +14,7 @@ The engine targets Windows and Linux, 2D only, on integrated GPUs with 2015+ har
 
 ## Decision
 
-Implement the first renderer on **OpenGL 3.3 core profile** with a single GL loader (pinned). Keep rendering behind the `render` interface: no GL types in public headers, no GL calls outside the backend.
+Implement the first renderer on **OpenGL 3.3 core profile** with a single GL loader (pinned). Keep rendering behind the `render` interface: no GL types in public headers. M1 platform context creation is the narrow exception to the no-GL-calls-outside-backend rule: it queries the actual driver version and profile to reject an unsuitable context; it does not render or clear.
 
 ## Consequences
 

@@ -33,9 +33,15 @@ changes between updates.
 - **Vendor the generated output** in `third_party/glad/` instead of generating at
   build time. The generator version, archive hash, exact command and license are
   recorded in `third_party/glad/README.md`.
-- Expose it as the static target `peri::gl_loader`. Nothing links it yet; the M2
-  renderer will call `gladLoadGL(SDL_GL_GetProcAddress)` after the context is
-  current.
+- Expose it as the static target `peri::gl_loader`. M1 platform context creation
+  and its tests link it to inspect actual driver context properties. Glad's
+  generated function table is process-global: a rendering backend must load GL
+  functions for its current context before use and after changing contexts.
+- M1 platform work creates an opt-in SDL GL 3.3 core context, verifies its
+  actual version/profile using glad and controls swap intervals. This corrects
+  the earlier M2-only context sequencing, which conflicted with the M1 roadmap.
+  The validation query is a narrow exception in ADR-0003; a clear still requires
+  a rendering backend.
 - Never hand-edit the generated files. Updates replace the directory wholesale
   and record the new version and hash.
 

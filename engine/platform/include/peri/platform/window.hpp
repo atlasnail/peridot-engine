@@ -6,8 +6,9 @@
 // A window is created once and destroyed with its owner; pump_events() must be
 // called once per frame and feeds InputState.
 //
-// The OpenGL context is created by the renderer in M2, not here, so window
-// creation works on machines (and CI) without a GPU.
+// OpenGL is opt-in so ordinary windows and headless CI do not require a GPU.
+// All window and context operations, including destruction, run on the main
+// thread; an active SdlSession must outlive the window.
 
 #include <memory>
 
@@ -24,15 +25,18 @@ struct WindowConfig {
     bool resizable = true;
     bool hidden = false;
     bool high_density = true;
-    // Stored for the renderer, which applies it when it creates the GL context.
+    // Initial swap interval request for an OpenGL window; ignored otherwise.
+    // Unsupported swap control is logged but does not prevent window creation.
     bool vsync = true;
+    // Request a GL 3.3 core context; false preserves non-GL window creation.
+    bool opengl = false;
 };
 
 class Window {
 public:
-    // Fails with an Error if the video subsystem or the window cannot be
-    // created. On headless CI, set SDL_VIDEODRIVER=dummy to use the dummy
-    // driver; the failure is reported, not fatal to the process.
+    // Fails if video/window creation fails, or if the actual GL context is
+    // not queryable GL 3.3 core or newer. The driver version/profile is logged.
+    // GL is unavailable on SDL's dummy driver; non-GL windows work headlessly.
     static Result<std::unique_ptr<Window>> create(const WindowConfig& config);
 
     ~Window();
@@ -50,6 +54,15 @@ public:
 
     void set_title(const char* title);
     void toggle_fullscreen();
+
+    // Make this window's context current before issuing GL commands. The GL
+    // operations below also make it current, replacing any current context.
+    // These return errors for non-GL windows or SDL failures; VSync requests
+    // may fail on unsupported drivers, so query the interval separately.
+    [[nodiscard]] Status make_gl_current();
+    [[nodiscard]] Status set_vsync(bool enabled);
+    [[nodiscard]] Result<int> swap_interval();
+    [[nodiscard]] Status swap_buffers();
 
     // Pixel size is what the renderer draws into; point size is what the OS
     // reports for UI/mouse coordinates.
