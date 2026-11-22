@@ -41,13 +41,14 @@ Last updated: 2026-11-22
   it checked window cleanup, no current context and successful recovery. The
   Windows platform CTest, dummy-driver unavailable path, formatting and local
   clang-tidy passed. The test override is compiled only when tests are enabled.
-- This does not prove GPU resources are leak-free, actual display synchronization
-  or visible-window behavior. Linux build, tests and real-driver behavior remain
-  unverified for these changes: WSL is not installed on this machine. Run CI
-  headlessly and the opt-in smoke test on a GL-capable Linux desktop. A GL clear
-  remains unimplemented because ADR-0003 confines drawing to a rendering backend.
-  No M1 gate is closed; no M2 renderer was started. No performance benchmark was
-  run for this opt-in context path.
+- CI on `742d5ad` passed on Windows and headless Linux (details below). Linux
+  used the dummy driver; the real-context and forced post-creation cleanup tests
+  are opt-in and did not run in that job. WSL is not installed locally. Run both
+  opt-in tests on a GL-capable Linux desktop. This does not prove GPU resources
+  are leak-free, actual display synchronization or visible-window behavior. A GL
+  clear remains unimplemented because ADR-0003 confines drawing to a rendering
+  backend. No M1 gate is closed; no M2 renderer was started. No performance
+  benchmark was run for this opt-in context path.
 
 ## Previous session: M1 action-mapping documentation
 
@@ -252,6 +253,12 @@ Last updated: 2026-11-22
 
 ## Verification
 
+- **CI on `742d5ad` passed** ([run 45070217448](https://github.com/atlasnail/peridot-engine/actions/runs/45070217448)):
+  Linux GCC Debug, ASan+UBSan and Release configure/build/test, formatting and
+  blocking static analysis passed; Windows MSVC Debug and Release
+  configure/build/test and formatting passed. Linux used SDL's dummy driver;
+  the opt-in real-GL smoke and failure-cleanup cases did not run there. This is
+  not Linux desktop, real-driver, VSync or performance-gate evidence.
 - **CI on `c507a18` passed** ([run 45068658429](https://github.com/atlasnail/peridot-engine/actions/runs/45068658429)):
   Windows MSVC formatting and Debug/Release configure, build and test passed.
   Linux GCC formatting, Debug/ASan+UBSan/Release configure, build and test, and
