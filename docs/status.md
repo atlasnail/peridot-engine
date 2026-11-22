@@ -32,20 +32,24 @@ Last updated: 2026-11-22
   reports `libgbm-dev`, `libgl1-mesa-dri` and `libglx-mesa0` version
   `25.2.8-0ubuntu0.24.04.4` superseded and removed; `.5` is published instead
   ([libgbm-dev history](https://launchpad.net/ubuntu/noble/amd64/libgbm-dev)).
-  The three pins have been updated together to `.5`; package installation on
-  CI remains unverified. Exact pins can break when Ubuntu retires them;
-  transitive packages and the runner image are not pinned.
+  The three pins were updated together to `.5` and installed in CI run
+  [45071444511](https://github.com/atlasnail/peridot-engine/actions/runs/45071444511).
+  Exact pins can break when Ubuntu retires them; transitive packages and the
+  runner image are not pinned.
 - Workflow YAML and outer/inner shell syntax passed locally. Both named tests
   passed on the Windows real context through the success-line filter, which also
   rejected skipped, failed and unmatched dummy-driver cases. The full pipeline
   could not run on Git Bash because `tee /dev/stderr` failed; the filter was
   tested without `tee`. `glxinfo` verifies its own renderer, not directly the
   engine test's renderer. No engine code was changed.
-- **Not yet verified on Linux or GitHub CI:** WSL is not installed and no Docker,
-  Podman, Multipass, Vagrant or libvirt command is available locally. Hosted
-  verification is pending on a dedicated branch. Even a successful llvmpipe
-  run would not verify a physical GPU, real desktop, Wayland,
-  actual VSync, GL clear or performance; M1 remains open.
+- CI on branch commit `db39b9a` passed on Ubuntu 24.04 and Windows. The Linux
+  Xvfb/llvmpipe step passed: its shell requires `glxinfo` to identify llvmpipe,
+  both named test success lines and successful command exit statuses. Individual
+  log lines were not available for inspection, so no context version is recorded.
+  The software-GL cases ran in Debug only, not under the sanitizer configuration.
+  WSL and other Linux runtimes were unavailable locally. This does not verify a
+  physical GPU, real desktop, Wayland, actual VSync, GL clear or performance;
+  M1 remains open.
 
 ## Previous session: M1 GL context groundwork
 
@@ -70,10 +74,10 @@ Last updated: 2026-11-22
   clang-tidy passed. The test override is compiled only when tests are enabled.
 - CI on `742d5ad` passed on Windows and headless Linux (details below). Linux
   used the dummy driver; the real-context and forced post-creation cleanup tests
-  are opt-in and did not run in that job. WSL is not installed locally. The new
-  software-GL CI step is not yet verified; run both opt-in tests on a GL-capable
-  Linux desktop as well. This does not prove GPU resources
-  are leak-free, actual display synchronization or visible-window behavior. A GL
+  are opt-in and did not run in that job. They passed later in software-GL CI
+  on `db39b9a` as described above; run both on a GPU-backed Linux desktop as
+  well. This does not prove GPU resources are leak-free, actual display
+  synchronization or visible-window behavior. A GL
   clear remains unimplemented because ADR-0003 confines drawing to a rendering
   backend. No M1 gate is closed; no M2 renderer was started. No performance
   benchmark was run for this opt-in context path.
@@ -281,6 +285,13 @@ Last updated: 2026-11-22
 
 ## Verification
 
+- **CI on `db39b9a` passed** ([run 45071444511](https://github.com/atlasnail/peridot-engine/actions/runs/45071444511)):
+  Linux GCC Debug, ASan+UBSan and Release build/test, formatting and blocking
+  static analysis passed; Windows MSVC Debug/Release build/test and formatting
+  passed. A separate Linux Debug Xvfb/Mesa software-GL step passed the renderer
+  and both named test checks; the ordinary Linux CTest runs used SDL's dummy
+  driver. The individual software-GL output was unavailable for inspection.
+  This is not GPU-driver, real desktop or performance-gate evidence.
 - **CI on `742d5ad` passed** ([run 45070217448](https://github.com/atlasnail/peridot-engine/actions/runs/45070217448)):
   Linux GCC Debug, ASan+UBSan and Release configure/build/test, formatting and
   blocking static analysis passed; Windows MSVC Debug and Release

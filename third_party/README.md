@@ -95,5 +95,5 @@ and update the pins together when necessary.
 
 The check selects SDL's X11 backend and Mesa llvmpipe under Xvfb. It is separate
 from the dummy-driver CTest run, and it does not verify a physical display,
-GPU driver, real VSync, Wayland or performance gates. Its first CI execution is
-still required to establish whether it works on the hosted runner.
+GPU driver, real VSync, Wayland or performance gates. Its first hosted execution
+passed on `db39b9a`; see `docs/status.md` for the evidence and limitations.
