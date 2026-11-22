@@ -24,10 +24,12 @@ Peridot.
 Use the horizontal lockup when introducing the engine; the standalone mark is
 for compact or already-branded contexts. Preserve proportions and the complete
 facet pattern. Leave clear space at least one quarter of the gem's width on all
-sides. Start at a minimum gem width of 32 px on screen and 8 mm in print;
-reproduce larger if the facets are not clear. Use a single solid background,
-choose a contrasting variant, and do not stretch, rotate, recolor individual
-facets or add effects. White SVGs need a dark background to be visible.
+sides. Start at a minimum gem width of 48 px on screen and 8 mm in print;
+reproduce larger if the facets are not clear. The screen minimum was reviewed
+at normal display scale; print legibility has not been tested. Use a single
+solid background, choose a contrasting variant, and do not stretch, rotate,
+recolor individual facets or add effects. White SVGs need a dark background to
+be visible.
 
 ## Palette
 

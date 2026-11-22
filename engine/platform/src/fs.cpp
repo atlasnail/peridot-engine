@@ -21,6 +21,10 @@
 namespace peri::fs {
 namespace {
 
+bool valid_path(std::string_view path) noexcept {
+    return path.find('\0') == std::string_view::npos;
+}
+
 #if defined(_WIN32)
 std::wstring widen(std::string_view utf8) {
     if (utf8.empty()) {
@@ -74,6 +78,10 @@ bool replace_file(const std::string& from, const std::string& to) {
 }  // namespace
 
 Result<std::string> read_text_file(std::string_view path) {
+    if (!valid_path(path)) {
+        PERI_LOG_ERROR("fs", "file path contains an embedded NUL");
+        return Error{ErrorCode::invalid_argument, "file path contains an embedded NUL"};
+    }
     const std::filesystem::path fs_path = to_path(path);
 
     std::error_code error;
@@ -115,6 +123,10 @@ Result<std::string> read_text_file(std::string_view path) {
 }
 
 Status write_text_file(std::string_view path, std::string_view contents) {
+    if (!valid_path(path)) {
+        PERI_LOG_ERROR("fs", "file path contains an embedded NUL");
+        return Status::failure(ErrorCode::invalid_argument, "file path contains an embedded NUL");
+    }
     const std::filesystem::path fs_path = to_path(path);
 
     std::ofstream file(fs_path, std::ios::binary | std::ios::trunc);
@@ -134,6 +146,10 @@ Status write_text_file(std::string_view path, std::string_view contents) {
 }
 
 Status write_text_file_atomic(std::string_view path, std::string_view contents) {
+    if (!valid_path(path)) {
+        PERI_LOG_ERROR("fs", "file path contains an embedded NUL");
+        return Status::failure(ErrorCode::invalid_argument, "file path contains an embedded NUL");
+    }
     std::string temp(path);
     temp += ".tmp";
 
@@ -154,12 +170,20 @@ Status write_text_file_atomic(std::string_view path, std::string_view contents) 
 }
 
 bool exists(std::string_view path) {
+    if (!valid_path(path)) {
+        return false;
+    }
     std::error_code error;
     const bool result = std::filesystem::exists(to_path(path), error);
     return !error && result;
 }
 
 Status create_directories(std::string_view path) {
+    if (!valid_path(path)) {
+        PERI_LOG_ERROR("fs", "directory path contains an embedded NUL");
+        return Status::failure(ErrorCode::invalid_argument,
+                               "directory path contains an embedded NUL");
+    }
     const std::filesystem::path fs_path = to_path(path);
 
     std::error_code error;

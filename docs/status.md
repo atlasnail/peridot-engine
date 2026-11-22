@@ -20,6 +20,27 @@ Last updated: 2026-11-22
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
+## Latest session: M1 file-system path safety
+
+- File operations now reject embedded NUL bytes in paths before accessing the
+  filesystem, preventing truncated-path reads, overwrites or atomic-write cleanup.
+  `exists` returns false for such paths. A regression test first reproduced the
+  read bug. Windows MSVC Debug build, platform CTest and formatting passed. Linux
+  CI for this change and real-desktop, hardware and performance M1 gates remain
+  open.
+
+## Previous session: brand review and M1 focus-loss check
+
+- Visually reviewed green, black and white mark and lockup variants on white,
+  deep forest and stone backgrounds. The gem and wordmark align consistently;
+  fine facets were difficult to distinguish at 32 px. The on-screen minimum
+  is now 48 px. Print legibility has not been tested.
+- Added an M1 synthetic focus-loss regression case: held keyboard and mouse
+  buttons release, and their action releases are delivered on the next fixed
+  step. Windows MSVC Debug build, platform CTest, the focused test using SDL's
+  dummy video driver (21 checks) and formatting passed. Linux and real desktop
+  focus behavior were not tested in this session. M1 remains open.
+
 ## Latest session: Peridot Engine rename and brand
 
 - Project name is Peridot Engine, shorthand `peri`; namespace, include paths,
@@ -33,9 +54,9 @@ Last updated: 2026-11-22
   and the pinned, OFL-licensed Manrope font; see ADR-0011. The name and logo
   have not been legally cleared. Windows MSVC Debug configure/build and all
   three CTest entries passed locally; formatting passed. SVG files parsed as
-  XML but were not visually reviewed. CI passed on both platforms for the rename
-  as detailed below; Linux was headless. No milestone or performance gate is
-  closed.
+  XML; the subsequent visual review is recorded above. CI passed on both
+  platforms for the rename as detailed below; Linux was headless. No milestone
+  or performance gate is closed.
 
 ## Latest session: withhold Windows CPU percentiles
 

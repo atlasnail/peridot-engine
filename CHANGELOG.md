@@ -70,6 +70,8 @@ releases may contain breaking changes, and they are always described below.
 
 ### Fixed
 
+- File-system operations reject embedded NUL bytes in paths rather than acting
+  on a truncated path. `exists` returns false for such paths.
 - Linux CI: added the XTest headers SDL requires, and replaced the whole-file
   read that tripped a GCC 13 null-dereference false positive at -O3.
 - Action edges were lost when a frame ran no fixed update and repeated when a

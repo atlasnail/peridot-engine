@@ -4,7 +4,8 @@
 //
 // Paths are UTF-8 strings and use '/' as the separator everywhere; Windows
 // accepts '/' as well. Conversion to native wide paths happens in the
-// implementation. Writes are explicit: a plain write can leave a partial file,
+// implementation. Paths containing embedded NUL bytes are rejected (exists()
+// returns false). Writes are explicit: a plain write can leave a partial file,
 // while write_text_file_atomic() replaces the destination only after the new
 // contents are complete. A stream flush is not a durable fsync; power-loss
 // protection and directory syncing are not implemented.

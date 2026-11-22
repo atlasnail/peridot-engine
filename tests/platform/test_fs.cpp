@@ -56,6 +56,34 @@ TEST_CASE(fs_atomic_write_replaces_and_leaves_no_temp) {
     cleanup_test_directory();
 }
 
+TEST_CASE(fs_rejects_embedded_nul_paths) {
+    reset_test_directory();
+    const std::string target = peri::fs::join(test_directory().string(), "target.txt");
+    REQUIRE(peri::fs::write_text_file(target, "original").is_ok());
+    std::string invalid_path = target;
+    invalid_path.push_back('\0');
+    invalid_path += "suffix";
+
+    const auto read = peri::fs::read_text_file(invalid_path);
+    REQUIRE(read.is_error());
+    CHECK(read.error().code == peri::ErrorCode::invalid_argument);
+    const auto plain = peri::fs::write_text_file(invalid_path, "wrong");
+    REQUIRE(plain.is_error());
+    CHECK(plain.error().code == peri::ErrorCode::invalid_argument);
+    const auto atomic = peri::fs::write_text_file_atomic(invalid_path, "wrong");
+    REQUIRE(atomic.is_error());
+    CHECK(atomic.error().code == peri::ErrorCode::invalid_argument);
+    CHECK(!peri::fs::exists(invalid_path));
+    const auto directory = peri::fs::create_directories(invalid_path);
+    REQUIRE(directory.is_error());
+    CHECK(directory.error().code == peri::ErrorCode::invalid_argument);
+    const auto original = peri::fs::read_text_file(target);
+    REQUIRE(original.is_ok());
+    CHECK(original.value() == "original");
+    CHECK(!peri::fs::exists(target + ".tmp"));
+    cleanup_test_directory();
+}
+
 TEST_CASE(fs_missing_file_is_not_found) {
     reset_test_directory();
     const std::string path = peri::fs::join(test_directory().string(), "absent.txt");
