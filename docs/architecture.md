@@ -205,9 +205,10 @@ What is actually true today, as opposed to intended:
   context. `make_gl_current` selects it before drawing; `set_vsync`,
   `swap_interval` and `swap_buffers` also make it current. Initial swap control
   is best-effort; errors from runtime requests are returned. Ordinary windows
-  remain headless-compatible. An opt-in test-only diagnostic clears and reads
-  the default back buffer under ADR-0003; no production clear or renderer exists.
-  Linux context version and desktop behavior need further checks.
+  remain headless-compatible. Opt-in test-only diagnostics clear and read the
+  default back buffer or present alternating clears for manual observation under
+  ADR-0003; no production clear or renderer exists. Linux context version and
+  desktop behavior need further checks.
 - `app` runs fixed updates with an interpolation alpha, an optional FPS limiter
   and an optional CSV frame log. It is internal API until the public surface is
   defined at M2.

@@ -20,7 +20,35 @@ Last updated: 2026-11-23
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 GL clear diagnostic
+## Latest session: visible M1 GL diagnostic
+
+- Added the separately opt-in, test-only `window_opengl_visible_clear_manual`.
+  It creates a visible GL window and alternates red and green once per second,
+  pumping events and swapping until closed or after ten seconds. It requires
+  successful clears and swaps for both colors; closing too early or minimizing
+  throughout can fail it. The diagnostic uses the fresh context's default
+  framebuffer state and explicitly selects its back buffer. No production
+  rendering API or M2 renderer was added.
+- Windows MSVC Debug build and the diagnostic passed on the Windows SDL driver,
+  AMD Radeon RX 9070 XT, GL 3.3 core, driver `26.11.1.261109`: 408 checks,
+  zero skipped or failed. Formatting passed. Without the opt-in, the diagnostic
+  skipped under SDL's dummy driver. This was an automated API-level run; no
+  person confirmed the window's contents. It does not prove visible presentation
+  or physical VSync. No Linux build or GPU-backed Linux run was performed.
+- For a human desktop check, run the following from Git Bash on Windows (or use
+  the analogous `build/linux-debug/bin/peri_platform_tests` on Linux):
+
+  ```bash
+  PERI_TEST_OPENGL_VISIBLE=1 build/windows-debug/bin/peri_platform_tests.exe window_opengl_visible_clear_manual
+  ```
+
+  Observe whether the window visibly alternates red and green each second. Wait
+  for both colors before closing, record the observation, OS/display backend,
+  GPU/driver, command and commit, and do not treat the test's `ok` as human
+  confirmation. GPU-backed Linux and visible presentation remain unverified;
+  M1 remains open.
+
+## Previous session: M1 GL clear diagnostic
 
 - Added `window_opengl_clear_readback`, an opt-in, test-only diagnostic under
   ADR-0003: it clears the default back buffer to two colors, reads two corner
@@ -407,9 +435,9 @@ Last updated: 2026-11-23
 3. M1 parity and hardware tests are incomplete: real gamepad, visible window,
    fullscreen, focus, DPI/minimize behavior, Linux display drivers, shutdown.
    Window tests skip when no video driver is available.
-4. M1 has an opt-in GL context, swap control and a test-only clear/readback
-   diagnostic, but no production clear backend. Version/profile validation
-   passed on Windows and on Linux's software context in CI; the Linux context's
+4. M1 has an opt-in GL context, swap control and test-only clear/readback and
+   visible-clear diagnostics, but no production clear backend. Version/profile
+   validation passed on Windows and on Linux's software context in CI; that context's
    reported values were not inspected. The new clear diagnostic passed on Windows
    and in Linux software CI, not on a GPU-backed Linux context. Actual VSync and
    visible rendering remain unverified. Minimized pause is implemented, but real
@@ -438,8 +466,8 @@ Last updated: 2026-11-23
 - Remaining M1 gates: visible-window checks on both platforms, real gamepad,
   minimized behavior, a real CPU-time measurement, and a GL clear/VSync pass.
   Run the test-only GL clear/readback diagnostic on a GPU-backed Linux desktop.
-  Separately verify visible clear and swap behavior on both systems and context
-  version/profile on GPU-backed Linux.
+  Have a person observe the visible-clear diagnostic on both systems; record
+  context version/profile and renderer on GPU-backed Linux.
 - Do not start the renderer (M2) or add store SDKs until sequencing is agreed.
 
 ## Gates closed in an earlier session

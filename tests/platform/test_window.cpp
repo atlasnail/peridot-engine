@@ -162,6 +162,71 @@ TEST_CASE(window_opengl_clear_readback) {
     REQUIRE(window->swap_buffers().is_ok());
 }
 
+TEST_CASE(window_opengl_visible_clear_manual) {
+    const char* requested = SDL_getenv("PERI_TEST_OPENGL_VISIBLE");
+    if (requested == nullptr || std::strcmp(requested, "1") != 0) {
+        SKIP_TEST("set PERI_TEST_OPENGL_VISIBLE=1 for a manual desktop check");
+    }
+    peri::WindowConfig config;
+    config.title = "Peridot GL diagnostic: red / green";
+    config.width = 640;
+    config.height = 480;
+    config.opengl = true;
+    config.vsync = false;
+    auto result = peri::Window::create(config);
+    REQUIRE(result.is_ok());
+    auto window = std::move(result.value());
+    REQUIRE(window->make_gl_current().is_ok());
+    REQUIRE(gladLoadGL(SDL_GL_GetProcAddress) != 0);
+    const auto* renderer = glGetString(GL_RENDERER);
+    const auto* version = glGetString(GL_VERSION);
+    const char* video_driver = SDL_GetCurrentVideoDriver();
+    REQUIRE(renderer != nullptr);
+    REQUIRE(version != nullptr);
+    REQUIRE(video_driver != nullptr);
+    auto* native = static_cast<SDL_Window*>(window->native_handle());
+    REQUIRE((SDL_GetWindowFlags(native) & SDL_WINDOW_HIDDEN) == 0);
+    std::printf("OpenGL visible diagnostic: %s; %s; SDL video driver: %s\n",
+                reinterpret_cast<const char*>(renderer), reinterpret_cast<const char*>(version),
+                video_driver);
+    std::printf(
+        "Observe alternating red and green each second; close the window or wait 10 seconds.\n"
+        "A passing test does not confirm visible presentation.\n");
+    std::fflush(stdout);
+
+    // This fresh context has the default framebuffer and color write state.
+    glDrawBuffer(GL_BACK);
+    REQUIRE(glGetError() == GL_NO_ERROR);
+
+    peri::InputState input;
+    const Uint64 start = SDL_GetTicks();
+    bool swapped_red = false;
+    bool swapped_green = false;
+    while (true) {
+        const Uint64 elapsed = SDL_GetTicks() - start;
+        if (elapsed >= 10000) {
+            break;
+        }
+        window->pump_events(input);
+        if (window->should_close()) {
+            break;
+        }
+        if (!window->is_minimized()) {
+            const bool red = (elapsed / 1000) % 2 == 0;
+            glClearColor(red ? 1.0f : 0.0f, red ? 0.0f : 1.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            REQUIRE(glGetError() == GL_NO_ERROR);
+            REQUIRE(window->swap_buffers().is_ok());
+            swapped_red = swapped_red || red;
+            swapped_green = swapped_green || !red;
+        }
+        SDL_Delay(50);
+    }
+    REQUIRE(swapped_red);
+    REQUIRE(swapped_green);
+    std::printf("Both colors submitted and swapped; presentation requires human observation.\n");
+}
+
 TEST_CASE(window_opengl_context_smoke) {
     const char* requested = SDL_getenv("PERI_TEST_OPENGL");
     if (requested == nullptr || std::strcmp(requested, "1") != 0) {
