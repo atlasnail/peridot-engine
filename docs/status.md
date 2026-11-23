@@ -33,8 +33,15 @@ Last updated: 2026-11-23
   AMD Radeon RX 9070 XT, GL 3.3 core, driver `26.11.1.261109`: 408 checks,
   zero skipped or failed. Formatting passed. Without the opt-in, the diagnostic
   skipped under SDL's dummy driver. This was an automated API-level run; no
-  person confirmed the window's contents. It does not prove visible presentation
-  or physical VSync. No GPU-backed Linux run was performed.
+  person confirmed the window's contents during that run. No GPU-backed Linux
+  run was performed.
+- At `b1ce709`, the user reported seeing the Windows diagnostic window alternate
+  colors during a subsequent run of `PERI_TEST_OPENGL_VISIBLE=1
+  build/windows-debug/bin/peri_platform_tests.exe window_opengl_visible_clear_manual`.
+  That run reported the Windows SDL driver, AMD Radeon RX 9070 XT, GL 3.3 core,
+  driver `26.11.1.261109`, and passed with 374 checks and no skips or failures.
+  This is user-reported visible alternation plus an automated clear/swap result,
+  not proof of physical VSync or Linux desktop behavior.
 - CI on `89c1310` passed on Linux and Windows in
   [run 45220364019](https://github.com/atlasnail/peridot-engine/actions/runs/45220364019).
   Linux Debug, ASan+UBSan and Release builds and CTest passed, as did static
@@ -51,8 +58,8 @@ Last updated: 2026-11-23
   Observe whether the window visibly alternates red and green each second. Wait
   for both colors before closing, record the observation, OS/display backend,
   GPU/driver, command and commit, and do not treat the test's `ok` as human
-  confirmation. GPU-backed Linux and visible presentation remain unverified;
-  M1 remains open.
+  confirmation. Visible presentation on a GPU-backed Linux desktop remains
+  unverified; M1 remains open.
 
 ## Previous session: M1 GL clear diagnostic
 
@@ -445,9 +452,10 @@ Last updated: 2026-11-23
    visible-clear diagnostics, but no production clear backend. Version/profile
    validation passed on Windows and on Linux's software context in CI; that context's
    reported values were not inspected. The new clear diagnostic passed on Windows
-   and in Linux software CI, not on a GPU-backed Linux context. Actual VSync and
-   visible rendering remain unverified. Minimized pause is implemented, but real
-   desktop behavior and the 10-second idle-CPU gate are not verified.
+   and in Linux software CI, not on a GPU-backed Linux context. A user observed
+   alternating colors on Windows; Linux visible presentation and physical VSync
+   remain unverified. Minimized pause is implemented, but real desktop behavior
+   and the 10-second idle-CPU gate are not verified.
 5. Fixed-step input keeps at most 128 pending changes per action and 256 raw
    button changes per pump, then fails explicitly during normal operation.
    Paused pumps instead discard transient edges and reconcile held state.
@@ -472,8 +480,8 @@ Last updated: 2026-11-23
 - Remaining M1 gates: visible-window checks on both platforms, real gamepad,
   minimized behavior, a real CPU-time measurement, and a GL clear/VSync pass.
   Run the test-only GL clear/readback diagnostic on a GPU-backed Linux desktop.
-  Have a person observe the visible-clear diagnostic on both systems; record
-  context version/profile and renderer on GPU-backed Linux.
+  Have a person observe the visible-clear diagnostic on GPU-backed Linux; record
+  context version/profile and renderer there.
 - Do not start the renderer (M2) or add store SDKs until sequencing is agreed.
 
 ## Gates closed in an earlier session
