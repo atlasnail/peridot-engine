@@ -20,7 +20,36 @@ Last updated: 2026-11-23
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: visible M1 GL diagnostic
+## Latest session: M1 swap-interval diagnostic
+
+- Added the separately opt-in, test-only `window_opengl_swap_interval_manual`.
+  It compares requested intervals 0 and 1 in a visible window using a moving
+  stripe made with scissored clears, a 0.5-second warm-up and four seconds of
+  unrestricted submissions per phase. It reports set/query outcomes, the SDL
+  display mode, submission rate and mean elapsed `Window::swap_buffers` duration
+  (including context selection). It fails rather than reporting a comparison if
+  either interval is unsupported or
+  mismatched, the window closes or minimizes, or it moves between displays.
+- Windows MSVC Debug build and the diagnostic passed at `9a15001` plus these
+  uncommitted changes, on Windows 11 Pro 10.0.26200, SDL Windows, AMD Radeon RX
+  9070 XT, OpenGL 3.3 core driver `26.11.1.261109`. SDL reported display `24N5C`,
+  1920x1080 at 60 Hz. Interval 0 set and queried as 0: 47,285 submissions in
+  4.000 s, 11,821.2 submissions/s, mean elapsed swap_buffers call 0.078 ms.
+  Interval 1 set and queried as 1: 300 submissions in 4.010 s, 74.8 submissions/s,
+  mean elapsed swap_buffers call 13.305 ms. These are a Debug diagnostic, not a
+  performance gate; elapsed call time includes blocking and is not CPU time.
+  The roughly 75 submissions/s versus reported 60 Hz is unexplained; no physical display
+  synchronization, actual refresh, VRR/driver override, or tearing was verified.
+  Formatting passed and the diagnostic skipped without its opt-in under the dummy
+  driver. No Linux build or GPU-backed Linux desktop run was performed.
+- To repeat from Git Bash, use `PERI_TEST_OPENGL_SWAP_INTERVAL=1
+  build/windows-debug/bin/peri_platform_tests.exe window_opengl_swap_interval_manual`.
+  The window title identifies each interval. Keep it on the selected display and
+  unminimized. The diagnostic has no physical-VSync pass criterion: confirmation
+  requires external observation/capture and a valid off-phase control. M1 remains
+  open and no M2 renderer was added.
+
+## Previous session: visible M1 GL diagnostic
 
 - Added the separately opt-in, test-only `window_opengl_visible_clear_manual`.
   It creates a visible GL window and alternates red and green once per second,
@@ -453,8 +482,10 @@ Last updated: 2026-11-23
    validation passed on Windows and on Linux's software context in CI; that context's
    reported values were not inspected. The new clear diagnostic passed on Windows
    and in Linux software CI, not on a GPU-backed Linux context. A user observed
-   alternating colors on Windows; Linux visible presentation and physical VSync
-   remain unverified. Minimized pause is implemented, but real desktop behavior
+   alternating colors on Windows; the interval comparison reports API and
+   host-side elapsed timing only. Linux visible presentation and physical VSync
+   remain unverified.
+   Minimized pause is implemented, but real desktop behavior
    and the 10-second idle-CPU gate are not verified.
 5. Fixed-step input keeps at most 128 pending changes per action and 256 raw
    button changes per pump, then fails explicitly during normal operation.

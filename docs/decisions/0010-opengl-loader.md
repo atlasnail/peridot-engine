@@ -40,8 +40,9 @@ changes between updates.
 - M1 platform work creates an opt-in SDL GL 3.3 core context, verifies its
   actual version/profile using glad and controls swap intervals. This corrects
   the earlier M2-only context sequencing, which conflicted with the M1 roadmap.
-  ADR-0003 also permits opt-in, test-only clear/readback and visible-presentation
-  diagnostics; production rendering and clearing remain behind the rendering backend.
+  ADR-0003 also permits opt-in, test-only clear/readback, visible-presentation and
+  swap-interval comparison diagnostics; production rendering and clearing remain
+  behind the rendering backend.
 - Never hand-edit the generated files. Updates replace the directory wholesale
   and record the new version and hash.
 

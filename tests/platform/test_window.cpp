@@ -1,5 +1,6 @@
 #include "framework.hpp"
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -225,6 +226,123 @@ TEST_CASE(window_opengl_visible_clear_manual) {
     REQUIRE(swapped_red);
     REQUIRE(swapped_green);
     std::printf("Both colors submitted and swapped; presentation requires human observation.\n");
+}
+
+TEST_CASE(window_opengl_swap_interval_manual) {
+    const char* requested = SDL_getenv("PERI_TEST_OPENGL_SWAP_INTERVAL");
+    if (requested == nullptr || std::strcmp(requested, "1") != 0) {
+        SKIP_TEST("set PERI_TEST_OPENGL_SWAP_INTERVAL=1 for a manual desktop comparison");
+    }
+    peri::WindowConfig config;
+    config.title = "Peridot GL swap interval diagnostic";
+    config.width = 640;
+    config.height = 480;
+    config.opengl = true;
+    config.vsync = false;
+    auto result = peri::Window::create(config);
+    REQUIRE(result.is_ok());
+    auto window = std::move(result.value());
+    REQUIRE(window->make_gl_current().is_ok());
+    REQUIRE(gladLoadGL(SDL_GL_GetProcAddress) != 0);
+    const auto* renderer = glGetString(GL_RENDERER);
+    const auto* version = glGetString(GL_VERSION);
+    const char* video_driver = SDL_GetCurrentVideoDriver();
+    REQUIRE(renderer != nullptr);
+    REQUIRE(version != nullptr);
+    REQUIRE(video_driver != nullptr);
+    auto* native = static_cast<SDL_Window*>(window->native_handle());
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(native);
+    REQUIRE(display != 0);
+    const char* display_name = SDL_GetDisplayName(display);
+    const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(display);
+    REQUIRE(display_name != nullptr);
+    REQUIRE(mode != nullptr);
+    std::printf("Swap diagnostic: %s; %s; SDL video driver: %s\n",
+                reinterpret_cast<const char*>(renderer), reinterpret_cast<const char*>(version),
+                video_driver);
+    std::printf("Display: %s, %dx%d, %.3f Hz (reported mode)\n", display_name, mode->w, mode->h,
+                static_cast<double>(mode->refresh_rate));
+    std::printf("Keep the window on this display and unminimized. Interval 0 then 1; "
+                "each phase has a 0.5 s warm-up and 4 s measurement.\n"
+                "API results and elapsed timings do not prove physical VSync.\n");
+    std::fflush(stdout);
+    glDrawBuffer(GL_BACK);
+    REQUIRE(glGetError() == GL_NO_ERROR);
+
+    using Clock = std::chrono::steady_clock;
+    peri::InputState input;
+    bool complete = true;
+    for (int interval = 0; interval <= 1; ++interval) {
+        const auto set = window->set_vsync(interval == 1);
+        if (set.is_error()) {
+            std::printf("Interval %d: set failed: %s; phase not measured\n", interval,
+                        set.error().message);
+            complete = false;
+            continue;
+        }
+        const auto actual = window->swap_interval();
+        if (actual.is_error()) {
+            std::printf("Interval %d: query failed: %s; phase not measured\n", interval,
+                        actual.error().message);
+            complete = false;
+            continue;
+        }
+        std::printf("Interval %d: set succeeded, queried %d\n", interval, actual.value());
+        if (actual.value() != interval) {
+            std::printf("Interval %d: query mismatch; phase not measured\n", interval);
+            complete = false;
+            continue;
+        }
+        window->set_title(interval == 0 ? "Peridot GL swap interval 0"
+                                        : "Peridot GL swap interval 1");
+        std::fflush(stdout);
+        const auto start = Clock::now();
+        const auto measurement_start = start + std::chrono::milliseconds(500);
+        unsigned long long frames = 0;
+        double swap_seconds = 0.0;
+        while (true) {
+            window->pump_events(input);
+            REQUIRE(!window->should_close());
+            REQUIRE(!window->is_minimized());
+            REQUIRE(SDL_GetDisplayForWindow(native) == display);
+            const auto now = Clock::now();
+            const double seconds = std::chrono::duration<double>(now - start).count();
+            if (seconds >= 4.5) {
+                break;
+            }
+            const peri::IVec2 size = window->size_pixels();
+            REQUIRE(size.x > 0 && size.y > 0);
+            // A moving vertical stripe makes tearing visible without a renderer.
+            const int stripe_width = size.x / 5 + 1;
+            const int stripe_x = static_cast<int>((seconds - static_cast<int>(seconds)) * size.x);
+            glDisable(GL_SCISSOR_TEST);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(stripe_x, 0, stripe_width, size.y);
+            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            REQUIRE(glGetError() == GL_NO_ERROR);
+            const auto swap_start = Clock::now();
+            REQUIRE(window->swap_buffers().is_ok());
+            const auto swap_end = Clock::now();
+            if (now >= measurement_start) {
+                ++frames;
+                swap_seconds += std::chrono::duration<double>(swap_end - swap_start).count();
+            }
+        }
+        const double measured =
+            std::chrono::duration<double>(Clock::now() - measurement_start).count();
+        REQUIRE(frames > 0 && measured > 0.0);
+        std::printf("Interval %d: %llu submissions in %.3f s (%.1f submissions/s); "
+                    "mean elapsed swap_buffers call %.3f ms\n",
+                    interval, frames, measured, static_cast<double>(frames) / measured,
+                    1000.0 * swap_seconds / static_cast<double>(frames));
+        std::fflush(stdout);
+    }
+    REQUIRE(complete);
+    std::printf(
+        "Timing and swap interval settings do not verify physical display synchronization.\n");
 }
 
 TEST_CASE(window_opengl_context_smoke) {

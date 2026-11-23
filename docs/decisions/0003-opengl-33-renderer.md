@@ -14,7 +14,7 @@ The engine targets Windows and Linux, 2D only, on integrated GPUs with 2015+ har
 
 ## Decision
 
-Implement the first renderer on **OpenGL 3.3 core profile** with a single GL loader (pinned). Keep rendering behind the `render` interface: no GL types in public headers. M1 platform context creation is a narrow exception to the no-GL-calls-outside-backend rule: it queries the actual driver version and profile to reject an unsuitable context; it does not render or clear. Opt-in, test-only M1 diagnostics may clear the default back buffer and read pixels, or present alternating clears in a visible window for a human desktop check. They are not a renderer or production drawing API; API success alone does not verify visible presentation.
+Implement the first renderer on **OpenGL 3.3 core profile** with a single GL loader (pinned). Keep rendering behind the `render` interface: no GL types in public headers. M1 platform context creation is a narrow exception to the no-GL-calls-outside-backend rule: it queries the actual driver version and profile to reject an unsuitable context; it does not render or clear. Opt-in, test-only M1 diagnostics may clear the default back buffer and read pixels, present alternating clears for a human desktop check, or use scissored clears to compare swap intervals. They are not a renderer or production drawing API; API success and host-side elapsed timing do not verify physical display synchronization.
 
 ## Consequences
 
