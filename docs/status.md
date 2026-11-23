@@ -37,11 +37,16 @@ Last updated: 2026-11-23
   Formatting and CI shell syntax checks passed. The test window was hidden:
   back-buffer readback and an accepted swap do not establish visible presentation
   or physical VSync.
-- The new diagnostic has not yet run in Linux software CI. WSL is not installed
-  locally and no Docker, Podman or Multipass command was available; the updated
-  workflow must run on the dedicated branch to establish Linux results. It
-  would cover software rendering, not a GPU-backed Linux desktop. M1 remains
-  open; no performance gate or complete visible-window goal is established.
+- CI on `9f2201b` passed on Windows and Linux in
+  [run 45218565438](https://github.com/atlasnail/peridot-engine/actions/runs/45218565438).
+  The Linux Debug Xvfb/Mesa software-GL step succeeded; its fail-closed commands
+  require the clear/readback test's success line and its own llvmpipe renderer
+  string, as well as the two existing context test success lines. Individual
+  job logs returned HTTP 403, so their context/version and pixel output were not
+  inspected. Linux Debug, ASan+UBSan and Release CTest and static analysis also
+  passed; the software-GL diagnostic ran in Debug only. WSL was unavailable
+  locally. Software readback does not establish visible GPU-backed presentation,
+  physical VSync or performance; M1 remains open.
 
 ## Previous session: Linux software OpenGL CI
 
@@ -406,7 +411,7 @@ Last updated: 2026-11-23
    diagnostic, but no production clear backend. Version/profile validation
    passed on Windows and on Linux's software context in CI; the Linux context's
    reported values were not inspected. The new clear diagnostic passed on Windows
-   but has not yet run in Linux CI. GPU-backed Linux contexts, actual VSync and
+   and in Linux software CI, not on a GPU-backed Linux context. Actual VSync and
    visible rendering remain unverified. Minimized pause is implemented, but real
    desktop behavior and the 10-second idle-CPU gate are not verified.
 5. Fixed-step input keeps at most 128 pending changes per action and 256 raw
@@ -432,9 +437,9 @@ Last updated: 2026-11-23
 
 - Remaining M1 gates: visible-window checks on both platforms, real gamepad,
   minimized behavior, a real CPU-time measurement, and a GL clear/VSync pass.
-  Run the test-only GL clear/readback diagnostic in Linux software CI and on a
-  GPU-backed Linux desktop. Separately verify visible clear and swap behavior on
-  both systems and context version/profile on GPU-backed Linux.
+  Run the test-only GL clear/readback diagnostic on a GPU-backed Linux desktop.
+  Separately verify visible clear and swap behavior on both systems and context
+  version/profile on GPU-backed Linux.
 - Do not start the renderer (M2) or add store SDKs until sequencing is agreed.
 
 ## Gates closed in an earlier session
