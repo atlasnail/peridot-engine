@@ -115,6 +115,53 @@ TEST_CASE(window_opengl_validation_failure_cleans_up) {
     REQUIRE(recovery.is_ok());
 }
 
+TEST_CASE(window_opengl_clear_readback) {
+    const char* requested = SDL_getenv("PERI_TEST_OPENGL");
+    if (requested == nullptr || std::strcmp(requested, "1") != 0) {
+        SKIP_TEST("set PERI_TEST_OPENGL=1 on a GL-capable desktop");
+    }
+    peri::WindowConfig config;
+    config.hidden = true;
+    config.opengl = true;
+    config.vsync = false;
+    auto result = peri::Window::create(config);
+    REQUIRE(result.is_ok());
+    auto window = std::move(result.value());
+    REQUIRE(window->make_gl_current().is_ok());
+    REQUIRE(gladLoadGL(SDL_GL_GetProcAddress) != 0);
+    const auto* renderer = glGetString(GL_RENDERER);
+    REQUIRE(renderer != nullptr);
+    std::printf("OpenGL clear renderer: %s\n", reinterpret_cast<const char*>(renderer));
+    const peri::IVec2 size = window->size_pixels();
+    REQUIRE(size.x > 0);
+    REQUIRE(size.y > 0);
+
+    // Read the default back buffer before swapping. Endpoint colors avoid
+    // rounding assumptions about the window's framebuffer format.
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDrawBuffer(GL_BACK);
+    glReadBuffer(GL_BACK);
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_DITHER);
+    glDisable(GL_FRAMEBUFFER_SRGB);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    REQUIRE(glGetError() == GL_NO_ERROR);
+    for (int color = 0; color < 2; ++color) {
+        glClearColor(color == 0 ? 1.0f : 0.0f, color == 1 ? 1.0f : 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        for (int corner = 0; corner < 2; ++corner) {
+            unsigned char pixel[4]{};
+            glReadPixels(corner == 0 ? 0 : size.x - 1, corner == 0 ? 0 : size.y - 1, 1, 1, GL_RGBA,
+                         GL_UNSIGNED_BYTE, pixel);
+            REQUIRE(glGetError() == GL_NO_ERROR);
+            CHECK(pixel[0] == (color == 0 ? 255 : 0));
+            CHECK(pixel[1] == (color == 1 ? 255 : 0));
+            CHECK(pixel[2] == 0);
+        }
+    }
+    REQUIRE(window->swap_buffers().is_ok());
+}
+
 TEST_CASE(window_opengl_context_smoke) {
     const char* requested = SDL_getenv("PERI_TEST_OPENGL");
     if (requested == nullptr || std::strcmp(requested, "1") != 0) {

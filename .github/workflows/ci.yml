@@ -121,8 +121,16 @@ jobs:
         run: |
           xvfb-run -a -s "-screen 0 1280x720x24" bash -euo pipefail -c '
             glxinfo -B | tee /dev/stderr | grep -i "OpenGL renderer string:.*llvmpipe"
-            for test in window_opengl_context_smoke window_opengl_validation_failure_cleans_up; do
-              build/linux-debug/bin/peri_platform_tests "$test" | tee /dev/stderr | grep -Fx "ok    $test"
+            for test in window_opengl_context_smoke window_opengl_validation_failure_cleans_up window_opengl_clear_readback; do
+              if ! output=$(build/linux-debug/bin/peri_platform_tests "$test"); then
+                printf "%s\n" "$output" >&2
+                exit 1
+              fi
+              printf "%s\n" "$output" >&2
+              grep -Fx "ok    $test" <<< "$output"
+              if [ "$test" = window_opengl_clear_readback ]; then
+                grep -i "^OpenGL clear renderer:.*llvmpipe" <<< "$output"
+              fi
             done
           '
 

@@ -2,7 +2,7 @@
 
 This is the source of truth for current implementation and verification.
 
-Last updated: 2026-11-22
+Last updated: 2026-11-23
 
 ## Current position
 
@@ -20,7 +20,30 @@ Last updated: 2026-11-22
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: Linux software OpenGL CI
+## Latest session: M1 GL clear diagnostic
+
+- Added `window_opengl_clear_readback`, an opt-in, test-only diagnostic under
+  ADR-0003: it clears the default back buffer to two colors, reads two corner
+  pixels for each, checks GL errors and swaps. This is not a production clear
+  API or the M2 renderer. The Linux Xvfb/llvmpipe CI step now requires its
+  explicit success line and its own renderer string to identify llvmpipe,
+  along with the existing context tests. On test failure, the CI loop also
+  prints captured stdout before exiting so diagnostics are not lost.
+- Windows MSVC Debug build and `PERI_TEST_OPENGL=1
+  build/windows-debug/bin/peri_platform_tests.exe window_opengl_clear_readback`
+  passed on an AMD Radeon RX 9070 XT, GL 3.3 core (profile mask `0x1`):
+  24 checks, no skips or failures. The same test with `SDL_VIDEODRIVER=dummy`
+  and opt-in set failed as expected because dummy cannot create a GL window.
+  Formatting and CI shell syntax checks passed. The test window was hidden:
+  back-buffer readback and an accepted swap do not establish visible presentation
+  or physical VSync.
+- The new diagnostic has not yet run in Linux software CI. WSL is not installed
+  locally and no Docker, Podman or Multipass command was available; the updated
+  workflow must run on the dedicated branch to establish Linux results. It
+  would cover software rendering, not a GPU-backed Linux desktop. M1 remains
+  open; no performance gate or complete visible-window goal is established.
+
+## Previous session: Linux software OpenGL CI
 
 - Added a separate Linux Debug CI step intended to run the existing M1 context
   smoke and forced-validation cleanup cases on Xvfb and Mesa llvmpipe. It forces
@@ -379,12 +402,13 @@ Last updated: 2026-11-22
 3. M1 parity and hardware tests are incomplete: real gamepad, visible window,
    fullscreen, focus, DPI/minimize behavior, Linux display drivers, shutdown.
    Window tests skip when no video driver is available.
-4. M1 now has an opt-in GL context and swap control, but no GL clear backend;
-   no approved roadmap exception is recorded. Version/profile validation passed
-   on Windows and on Linux's software context in CI; the Linux context's reported
-   values were not inspected. GPU-backed Linux contexts, actual VSync and visible
-   rendering remain unverified. Minimized pause is implemented, but real desktop
-   behavior and the 10-second idle-CPU gate are not verified.
+4. M1 has an opt-in GL context, swap control and a test-only clear/readback
+   diagnostic, but no production clear backend. Version/profile validation
+   passed on Windows and on Linux's software context in CI; the Linux context's
+   reported values were not inspected. The new clear diagnostic passed on Windows
+   but has not yet run in Linux CI. GPU-backed Linux contexts, actual VSync and
+   visible rendering remain unverified. Minimized pause is implemented, but real
+   desktop behavior and the 10-second idle-CPU gate are not verified.
 5. Fixed-step input keeps at most 128 pending changes per action and 256 raw
    button changes per pump, then fails explicitly during normal operation.
    Paused pumps instead discard transient edges and reconcile held state.
@@ -408,9 +432,9 @@ Last updated: 2026-11-22
 
 - Remaining M1 gates: visible-window checks on both platforms, real gamepad,
   minimized behavior, a real CPU-time measurement, and a GL clear/VSync pass.
-  Decide how to supply the M1 clear within ADR-0003's backend boundary, then
-  verify the clear and swap behavior on both systems and context version/profile
-  on GPU-backed Linux.
+  Run the test-only GL clear/readback diagnostic in Linux software CI and on a
+  GPU-backed Linux desktop. Separately verify visible clear and swap behavior on
+  both systems and context version/profile on GPU-backed Linux.
 - Do not start the renderer (M2) or add store SDKs until sequencing is agreed.
 
 ## Gates closed in an earlier session
