@@ -28,8 +28,8 @@ Last updated: 2026-11-23
   unrestricted submissions per phase. It reports set/query outcomes, the SDL
   display mode, submission rate and mean elapsed `Window::swap_buffers` duration
   (including context selection). It fails rather than reporting a comparison if
-  either interval is unsupported or
-  mismatched, the window closes or minimizes, or it moves between displays.
+  either interval is unsupported or mismatched, the window closes or minimizes,
+  or it moves between displays.
 - Windows MSVC Debug build and the diagnostic passed at `9a15001` plus these
   uncommitted changes, on Windows 11 Pro 10.0.26200, SDL Windows, AMD Radeon RX
   9070 XT, OpenGL 3.3 core driver `26.11.1.261109`. SDL reported display `24N5C`,
@@ -38,10 +38,16 @@ Last updated: 2026-11-23
   Interval 1 set and queried as 1: 300 submissions in 4.010 s, 74.8 submissions/s,
   mean elapsed swap_buffers call 13.305 ms. These are a Debug diagnostic, not a
   performance gate; elapsed call time includes blocking and is not CPU time.
-  The roughly 75 submissions/s versus reported 60 Hz is unexplained; no physical display
-  synchronization, actual refresh, VRR/driver override, or tearing was verified.
-  Formatting passed and the diagnostic skipped without its opt-in under the dummy
-  driver. No Linux build or GPU-backed Linux desktop run was performed.
+  The roughly 75 submissions/s versus reported 60 Hz is unexplained; no physical
+  display synchronization, actual refresh, VRR/driver override, or tearing was
+  verified. Formatting passed and the diagnostic skipped without its opt-in
+  under the dummy driver. No GPU-backed Linux desktop run was performed.
+- CI on `b99eede` passed on Linux and Windows in
+  [run 45222728304](https://github.com/atlasnail/peridot-engine/actions/runs/45222728304).
+  Linux Debug, ASan+UBSan and Release builds and CTest passed, as did static
+  analysis and the existing Xvfb/llvmpipe hidden-context/readback step. The new
+  manual swap-interval diagnostic was not enabled in headless CI; this establishes
+  compilation and headless coverage, not Linux interval behavior or physical VSync.
 - To repeat from Git Bash, use `PERI_TEST_OPENGL_SWAP_INTERVAL=1
   build/windows-debug/bin/peri_platform_tests.exe window_opengl_swap_interval_manual`.
   The window title identifies each interval. Keep it on the selected display and
@@ -484,8 +490,7 @@ Last updated: 2026-11-23
    and in Linux software CI, not on a GPU-backed Linux context. A user observed
    alternating colors on Windows; the interval comparison reports API and
    host-side elapsed timing only. Linux visible presentation and physical VSync
-   remain unverified.
-   Minimized pause is implemented, but real desktop behavior
+   remain unverified. Minimized pause is implemented, but real desktop behavior
    and the 10-second idle-CPU gate are not verified.
 5. Fixed-step input keeps at most 128 pending changes per action and 256 raw
    button changes per pump, then fails explicitly during normal operation.
