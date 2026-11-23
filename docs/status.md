@@ -34,7 +34,13 @@ Last updated: 2026-11-23
   zero skipped or failed. Formatting passed. Without the opt-in, the diagnostic
   skipped under SDL's dummy driver. This was an automated API-level run; no
   person confirmed the window's contents. It does not prove visible presentation
-  or physical VSync. No Linux build or GPU-backed Linux run was performed.
+  or physical VSync. No GPU-backed Linux run was performed.
+- CI on `89c1310` passed on Linux and Windows in
+  [run 45220364019](https://github.com/atlasnail/peridot-engine/actions/runs/45220364019).
+  Linux Debug, ASan+UBSan and Release builds and CTest passed, as did static
+  analysis and the existing Xvfb/llvmpipe hidden-context/readback step. The new
+  manual visible diagnostic was not enabled in headless CI, so the Linux result
+  establishes compilation and headless checks, not visible presentation.
 - For a human desktop check, run the following from Git Bash on Windows (or use
   the analogous `build/linux-debug/bin/peri_platform_tests` on Linux):
 
