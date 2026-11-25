@@ -14,17 +14,46 @@ Last updated: 2026-11-25
   (`peri::SdlSession`), so shutdown is deterministic. The opt-in GL context
   and swap-control groundwork exists, but clear, desktop and hardware checks,
   and a real CPU-time measurement remain open.
-- **Physical-VSync evidence:** the exclusive-fullscreen diagnostic reports
-  interval 1 at the read-back 60 Hz mode on Windows, with interval 0 and 2
-  controls behaving as expected, but no capture exists, so physical VSync is
-  unverified and M1 stays open.
+- **Physical-VSync evidence:** two exclusive-fullscreen runs put interval 1 at
+  59.94/s and 60.00/s against a read-back 60 Hz mode, with the 0 and 2 controls
+  scaling as expected, but the interval-1 gap distribution differed between the
+  runs and no capture exists, so physical VSync is unverified and M1 stays open.
 - Version `0.1.0-dev`; implementation: core and SDL3 platform, tests and
   `bench_blank`. No game renderer or audio.
 - The existing remote is `https://github.com/atlasnail/engine.git`. The rename
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 exclusive-fullscreen alternation diagnostic
+## Latest session: M1 alternation rerun
+
+- Ran `window_opengl_alternation_manual` a second time on 2026-11-25 after asking
+  first, on the same machine, build and display: Windows 11 Pro 10.0.26200, MSVC
+  Debug, RX 9070 XT driver `26.11.1.261109`, `24N5C` read back as `60/1` =
+  60.0000 Hz. CSV:
+  `benchmarks/results/windows-alternation-2026-11-25-run2.csv`. Exit 0, 20
+  checks, none failed; the desktop was confirmed back at 1920x1080.
+- The interval rates reproduced: 59.94/s then 60.00/s at interval 1, 29.94/s then
+  30.00/s at interval 2, with interval 0 unthrottled both times (3517.71/s then
+  4845.53/s, which varies with machine load and is not a like-for-like number).
+  Both interval-1 rates sit within 0.1 % of the read-back mode and interval 2
+  lands on exactly half, so the interval controls behave the same way twice.
+- The gap distribution did not reproduce. Run 1 had a 13.480 ms median with a
+  26.765 ms p90, bimodal, averaging to 60/s. Run 2 is uniform: interval 1 at a
+  16.664 ms median (p10 16.276 ms, p90 17.055 ms) and interval 2 at 33.333 ms
+  (p10 33.063 ms, p90 33.590 ms). The burst-queue explanation recorded below is
+  therefore an unreproduced hypothesis rather than a property of this path;
+  run-to-run variation is at least as likely to come from the mode switch, the
+  still-active 75 Hz output or ordinary scheduling.
+- What two runs establish: in exclusive fullscreen the submission rate follows
+  the selected mode instead of the 75 Hz composition clock, and the 0/1/2
+  controls scale as expected, twice. What they do not establish: physical VSync.
+  Neither run captured the screen or measured the panel. Run 2's uniformity is
+  what a vblank-locked present path looks like, but submission timestamps cannot
+  separate that from a driver limiter using the same mode rate. VRR state, the
+  second output and a named witness are still unaddressed, M1 stays open and no
+  exception has been requested.
+
+## Previous session: M1 exclusive-fullscreen alternation diagnostic
 
 - Ran the new `window_opengl_alternation_manual` diagnostic once on 2026-11-25
   after asking for approval, because it switches the window to exclusive
@@ -54,10 +83,11 @@ Last updated: 2026-11-25
   runs at 3517/s. The composition clamp recorded in the session below does not
   survive exclusive fullscreen, which is the first software-level evidence that
   the ~75 Hz pacing came from DWM composition rather than the driver.
-- The interval-1 gaps are not a smooth 16.667 ms cadence: the median is 13.480 ms
-  with a 26.765 ms p90, a bimodal pattern that only averages to the 60 Hz rate.
-  A present queue releasing frames in bursts produces exactly this, and submission
-  timestamps cannot tell which frame was displayed when; only a capture can.
+- The interval-1 gaps in this run were not a smooth 16.667 ms cadence: the
+  median was 13.480 ms with a 26.765 ms p90, a bimodal pattern averaging to the
+  60 Hz rate. It did not reproduce in the rerun above, so it is recorded as a
+  single-run observation; submission timestamps cannot say which frame was
+  displayed when, and only a capture can.
 - The CSV holds `interval,submission,wall_seconds,elapsed_seconds,background`,
   14,430 rows covering 3.999 s, 3.987 s and 3.974 s of steady time. Each phase's
   wall-clock span matched its steady span, so a camera recording can be aligned by
