@@ -37,20 +37,22 @@ Last updated: 2026-11-25
   and interval 0 1436.18/s. The exclusive rate therefore does not depend on the
   75 Hz output being present, which the two-output runs implied and this control
   confirms.
-- The spacing was looser than in the two-output runs, and repeating the
-  single-output run twice confirmed it rather than dissolving it. Three runs at
-  interval 1 gave medians of 16.674, 16.713 and 16.641 ms against the 16.667 ms of
-  a 60 Hz mode, but with far heavier tails than the two-output runs: p10
-  8.331-14.817 ms and p90 18.476-24.299 ms, where the two-output runs stayed
-  inside 16.2-17.1 ms. Interval 2 widened the same way (p10 25.899-31.923, p90
-  34.479-40.354). The rate is unaffected; the jitter is reproducible in this
-  configuration and its cause is not established.
-- The three single-output repeats are in
+- Three single-output runs at interval 1 gave medians of 16.674, 16.713 and
+  16.641 ms against the 16.667 ms of a 60 Hz mode, with p10 8.331-14.817 ms and
+  p90 18.476-24.299 ms. Those tails were heavier than in the earlier two-output
+  runs, which stayed inside 16.2-17.1 ms, and interval 2 widened the same way
+  (p10 25.899-31.923, p90 34.479-40.354). The rate was unaffected throughout.
+- That difference does not survive a fair comparison, so no claim is made about
+  it. A two-output run taken minutes after restoring the topology reported
+  phase 1 at p10 16.060 / p90 17.170 ms but phase 4 at p10 14.775 / p90 18.362 ms,
+  overlapping the single-output spans, so the spacing varies run to run and phase
+  to phase in both configurations. The stable facts are the 60 Hz rate and the
+  16.6-16.7 ms median; queue depth, DWM behaviour and ordinary scheduling remain
+  equally plausible and untested.
+- The repeats are
   `benchmarks/results/windows-alternation-2026-11-25-single-output.csv`,
-  `-2.csv` and `-3.csv`. The difference only merits follow-up if it survives a
-  longer run: the median is correct every time and nothing here says which frame
-  reached the panel, so queue depth, DWM on a single output and ordinary
-  scheduling all remain possible.
+  `-2.csv`, `-3.csv`, and the contemporaneous control
+  `...-two-output-after.csv`.
 - Physical VSync remains unclaimed: these are submissions, with no capture, no
   panel measurement and no tear check. M1 stays open and no exception was
   requested.
