@@ -41,11 +41,11 @@ Last updated: 2026-11-25
   Formatting passed and the diagnostic skipped without its opt-in under the
   dummy driver. No GPU-backed Linux desktop run was performed.
 - The roughly 75 submissions/s against a reported 60 Hz mode was investigated on
-  2026-11-25 with read-only checks; no display settings, source files or window
-  placement were changed. The existing binary reproduced it: `24N5C` reported at
-  60.000 Hz, interval 0 at 11,963.1 submissions/s (mean elapsed call 0.077 ms),
-  interval 1 at 74.8 submissions/s (mean 13.300 ms), both intervals set and
-  queried as requested.
+  2026-11-25. The first checks were read-only and changed no display settings,
+  source files or window placement. The existing binary reproduced it: `24N5C`
+  reported at 60.000 Hz, interval 0 at 11,963.1 submissions/s (mean elapsed call
+  0.077 ms), interval 1 at 74.8 submissions/s (mean 13.300 ms), both intervals
+  set and queried as requested.
 - Native Win32 queries show the desktop is not running at the window monitor's
   rate. The RX 9070 XT drives two active outputs, `\\.\DISPLAY1` at 1920x1080
   60 Hz (primary) and `\\.\DISPLAY2` at 1920x1080 75 Hz. `GetWindowRect` and
@@ -63,14 +63,29 @@ Last updated: 2026-11-25
   mixed-refresh desktops compose at the highest active refresh
   ([Chromium's DWM note](https://issues.chromium.org/issues/40273080) reports
   `DwmGetCompositionTimingInfo` returning DWM's highest rate in such setups).
-  It is correlation, not proof: one 75 Hz observation cannot separate DWM
-  queueing from a driver or control-panel VSync override, submissions are not
-  displayed frames, and no physical refresh, tear line or display output was
-  observed.
-- Separating those requires repeating the comparison with only the 60 Hz output
-  active, or with both outputs at one rate, which changes display configuration
-  and was not performed, plus external observation or capture. Physical VSync
-  and the Windows/Linux desktop gates remain open.
+  Before the control below, that was correlation rather than proof: a single
+  75 Hz observation cannot separate DWM queueing from a driver or control-panel
+  VSync override.
+- The single-output control was run after asking first, using
+  `DisplaySwitch.exe /internal` (PC screen only) with `/extend` restored
+  immediately afterwards. The desktop was confirmed back at two active outputs,
+  a 60 Hz primary and a 75 Hz secondary, and composition returned to 75 Hz.
+  With only the 60 Hz output active, `DwmFlush` measured 60.02 per second
+  (16.655 ms median over 151 waits) and the same diagnostic reported interval 0
+  at 9,289.7 submissions/s (mean elapsed call 0.089 ms) and interval 1 at 59.8
+  submissions/s, 240 submissions in 4.010 s with a 16.625 ms mean. Interval 1
+  tracked the composition clock in both topologies: 74.8/s against 74.97/s with
+  two outputs, and 59.8/s against 60.02/s with only the 60 Hz output. The ~75 Hz
+  pacing is therefore a desktop-composition clamp, not a 75 Hz panel and not
+  synchronization to the window monitor's own mode.
+- What this still does not establish: physical VSync. Submissions are not
+  displayed frames, no screen or capture was observed, no tear line was checked
+  and the panel's real scan rate was not measured. It also cannot separate DWM
+  queueing from a driver that consults the same desktop refresh, does not show
+  what pacing a window on the 75 Hz output would get, and does not rule out a
+  control-panel VSync override; both outputs were never forced to one rate and
+  VRR state was not inspected. Physical VSync and the Windows/Linux desktop
+  gates remain open.
 - CI on `b99eede` passed on Linux and Windows in
   [run 45222728304](https://github.com/atlasnail/peridot-engine/actions/runs/45222728304).
   Linux Debug, ASan+UBSan and Release builds and CTest passed, as did static
