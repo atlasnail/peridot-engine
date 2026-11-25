@@ -428,16 +428,20 @@ TEST_CASE(window_opengl_alternation_manual) {
     CsvFile csv;
     REQUIRE(open_csv(&csv.file, csv_path));
     std::fprintf(csv.file, "phase,interval,submission,wall_seconds,elapsed_seconds,background\n");
-    std::printf("Frame timestamps: %s (wall_seconds is system_clock; compare it with the "
-                "capture)\n",
+    std::printf("Frame timestamps: %s (submission is the phase-wide index the marker shows; "
+                "wall_seconds is system_clock)\n",
                 csv_path);
     std::printf("Film this screen at 240 fps or more for capture evidence. The background "
                 "alternates black and white four times a second; each phase warms up 0.5 s, "
                 "then logs 4 s. Interval 1 should pace at the read-back refresh, 0 should not, "
                 "2 should halve it, and the last phase repeats interval 1 so its spacing can be "
-                "compared within one session. This run alone does not verify physical VSync.\n");
+                "compared within one session. The top eighth is a grey marker band: eight "
+                "blocks carry the low bits of the submission index, leftmost is bit 0, white is "
+                "1 and black is 0, repeating every 256 submissions. This run alone does not "
+                "verify physical VSync.\n");
     std::fflush(stdout);
     glDrawBuffer(GL_BACK);
+    glReadBuffer(GL_BACK);
     REQUIRE(glGetError() == GL_NO_ERROR);
 
     using Clock = std::chrono::steady_clock;
@@ -472,9 +476,11 @@ TEST_CASE(window_opengl_alternation_manual) {
         const auto start = Clock::now();
         const auto measurement_start = start + std::chrono::milliseconds(500);
         unsigned long long frames = 0;
+        unsigned long long submission = 0;
         unsigned long long changes = 0;
         bool have_previous = false;
         bool previous_white = false;
+        bool marker_verified = false;
         bool phase_complete = true;
         while (true) {
             window->pump_events(input);
@@ -498,11 +504,47 @@ TEST_CASE(window_opengl_alternation_manual) {
             glDisable(GL_SCISSOR_TEST);
             glClearColor(white ? 1.0f : 0.0f, white ? 1.0f : 0.0f, white ? 1.0f : 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
+            // Coarse frame marker: a grey band across the top eighth with eight
+            // blocks carrying the low bits of the submission index, least
+            // significant bit on the left. A 240 fps capture can name the
+            // submission it shows instead of relying on wall clocks, and the
+            // index repeats only every 256 submissions (4.3 s at 60 Hz).
+            const int band_height = size.y / 8;
+            const int block_width = size.x / 8;
+            if (band_height > 0 && block_width > 0) {
+                glEnable(GL_SCISSOR_TEST);
+                glScissor(0, size.y - band_height, size.x, band_height);
+                glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT);
+                for (int bit = 0; bit < 8; ++bit) {
+                    const bool set = ((submission >> bit) & 1u) != 0;
+                    glScissor(bit * block_width, size.y - band_height, block_width, band_height);
+                    glClearColor(set ? 1.0f : 0.0f, set ? 1.0f : 0.0f, set ? 1.0f : 0.0f, 1.0f);
+                    glClear(GL_COLOR_BUFFER_BIT);
+                }
+                glDisable(GL_SCISSOR_TEST);
+            }
             if (glGetError() != GL_NO_ERROR) {
                 std::printf("Phase %d (interval %d): GL error during clear; phase stopped\n", phase,
                             interval);
                 phase_complete = false;
                 break;
+            }
+            // One read-back per phase proves the marker matches the counter it
+            // claims to encode; repeating it would distort the pacing measured.
+            if (!marker_verified && now >= measurement_start && band_height > 0 &&
+                block_width > 0) {
+                bool marker_matches = true;
+                for (int bit = 0; bit < 8; ++bit) {
+                    unsigned char pixel[4]{};
+                    glReadPixels((2 * bit + 1) * block_width / 2, size.y - band_height / 2, 1, 1,
+                                 GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+                    const bool lit = pixel[0] > 128;
+                    const bool expected = ((submission >> bit) & 1u) != 0;
+                    marker_matches = marker_matches && lit == expected;
+                }
+                CHECK(marker_matches);
+                marker_verified = true;
             }
             const auto wall = std::chrono::system_clock::now();
             if (!window->swap_buffers().is_ok()) {
@@ -514,7 +556,7 @@ TEST_CASE(window_opengl_alternation_manual) {
             if (now >= measurement_start) {
                 const double wall_seconds =
                     std::chrono::duration<double>(wall.time_since_epoch()).count();
-                std::fprintf(csv.file, "%d,%d,%llu,%.6f,%.6f,%s\n", phase, interval, frames,
+                std::fprintf(csv.file, "%d,%d,%llu,%.6f,%.6f,%s\n", phase, interval, submission,
                              wall_seconds, elapsed, white ? "white" : "black");
                 if (have_previous && white != previous_white) {
                     ++changes;
@@ -523,6 +565,7 @@ TEST_CASE(window_opengl_alternation_manual) {
                 previous_white = white;
                 ++frames;
             }
+            ++submission;
         }
 
         window->pump_events(input);

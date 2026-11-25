@@ -24,7 +24,34 @@ Last updated: 2026-11-25
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 alternation interval-1 repeat
+## Latest session: M1 alternation frame marker
+
+- Added a coarse visual frame marker to `window_opengl_alternation_manual` so a
+  240 fps capture can name the submission each captured frame shows instead of
+  matching wall clocks. Every frame draws a grey band across the top eighth of
+  the screen, then eight blocks carrying the low bits of the phase-wide
+  submission index: leftmost block is bit 0, white is 1, black is 0. The index
+  repeats every 256 submissions, 4.3 s at 60 Hz, longer than a phase, so no
+  pattern recurs within one measurement. It costs nine scissored clears per
+  frame, no allocation and no render path.
+- The CSV `submission` column is now that phase-wide index, so a decoded pattern
+  maps to a row directly. Rows are still written only inside the measured 4 s
+  window, so the first row starts after the warm-up count rather than at 0; the
+  column set is otherwise unchanged at
+  `phase,interval,submission,wall_seconds,elapsed_seconds,background`.
+- The marker is checked, not merely drawn: once per phase, on the first measured
+  submission, the diagnostic reads back the centre of each of the eight blocks
+  and compares it with the index it encoded, which adds one check per phase (25
+  in a full four-phase run). Repeated read-backs were avoided because they would
+  distort the pacing being measured.
+- Not run with the marker: it does not change what a run proves and no capture
+  exists. It builds under MSVC Debug, the local suite passes and the case still
+  skips without `PERI_TEST_OPENGL_ALTERNATION=1`; it is not enabled in CI. The
+  four earlier exclusive-fullscreen runs still have no capture, so physical
+  VSync remains unverified on both platforms and no exception has been
+  requested.
+
+## Previous session: M1 alternation interval-1 repeat
 
 - `window_opengl_alternation_manual` now runs four phases in one session:
   intervals 1, 0, 2, then interval 1 again, and its CSV gained a leading `phase`
