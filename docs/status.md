@@ -14,17 +14,39 @@ Last updated: 2026-11-25
   (`peri::SdlSession`), so shutdown is deterministic. The opt-in GL context
   and swap-control groundwork exists, but clear, desktop and hardware checks,
   and a real CPU-time measurement remain open.
-- **Physical-VSync evidence:** eight exclusive-fullscreen runs pace interval 1
-  within 0.1 % of a read-back 60 Hz mode, three of them from the Release build,
-  and a windowed control in the same session still paces at 74.8/s, but no
-  capture exists, so physical VSync is unverified and M1 stays open.
+- **Physical-VSync evidence:** nine exclusive-fullscreen runs, one with only
+  the 60 Hz output active and three from the Release build, pace interval 1
+  within 0.1 % of a read-back 60 Hz mode, while a windowed control still paces at
+  74.8/s; no capture exists, so physical VSync is unverified and M1 stays open.
 - Version `0.1.0-dev`; implementation: core and SDL3 platform, tests and
   `bench_blank`. No game renderer or audio.
 - The existing remote is `https://github.com/atlasnail/engine.git`. The rename
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 Release runs and a paired windowed control
+## Latest session: M1 single-output exclusive control
+
+- Repeated the exclusive-fullscreen run with only the 60 Hz output active, using
+  the same `DisplaySwitch.exe /internal` and `/extend` restore as the earlier
+  windowed control, verified with `EnumDisplayDevices`: two active outputs
+  before, one during, two after. Approval covered this test sweep, so the run was
+  taken without another prompt. `24N5C` read back `60/1` again, exit 0, 25
+  checks, none failed. CSV:
+  `benchmarks/results/windows-alternation-2026-11-25-single-output.csv`.
+- Interval 1 measured 59.93/s and 60.04/s in its two phases, interval 2 30.01/s
+  and interval 0 1436.18/s. The exclusive rate therefore does not depend on the
+  75 Hz output being present, which the two-output runs implied and this control
+  confirms.
+- The spacing was looser than in the two-output runs: p10 12.896 ms and p90
+  20.548 ms around a 16.674 ms median, against 16.2-17.1 ms there. One run taken
+  immediately after a topology and mode switch cannot separate a settling
+  transient from ordinary variance, and it was not repeated, so it is recorded as
+  an observation rather than a result.
+- Physical VSync remains unclaimed: these are submissions, with no capture, no
+  panel measurement and no tear check. M1 stays open and no exception was
+  requested.
+
+## Previous session: M1 Release runs and a paired windowed control
 
 - Built and tested `windows-release` this session (configure, build and CTest
   clean), then ran the marker-enabled diagnostic three times from it. `24N5C`
