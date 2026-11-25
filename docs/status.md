@@ -2,7 +2,7 @@
 
 This is the source of truth for current implementation and verification.
 
-Last updated: 2026-11-23
+Last updated: 2026-11-25
 
 ## Current position
 
@@ -38,10 +38,39 @@ Last updated: 2026-11-23
   Interval 1 set and queried as 1: 300 submissions in 4.010 s, 74.8 submissions/s,
   mean elapsed swap_buffers call 13.305 ms. These are a Debug diagnostic, not a
   performance gate; elapsed call time includes blocking and is not CPU time.
-  The roughly 75 submissions/s versus reported 60 Hz is unexplained; no physical
-  display synchronization, actual refresh, VRR/driver override, or tearing was
-  verified. Formatting passed and the diagnostic skipped without its opt-in
-  under the dummy driver. No GPU-backed Linux desktop run was performed.
+  Formatting passed and the diagnostic skipped without its opt-in under the
+  dummy driver. No GPU-backed Linux desktop run was performed.
+- The roughly 75 submissions/s against a reported 60 Hz mode was investigated on
+  2026-11-25 with read-only checks; no display settings, source files or window
+  placement were changed. The existing binary reproduced it: `24N5C` reported at
+  60.000 Hz, interval 0 at 11,963.1 submissions/s (mean elapsed call 0.077 ms),
+  interval 1 at 74.8 submissions/s (mean 13.300 ms), both intervals set and
+  queried as requested.
+- Native Win32 queries show the desktop is not running at the window monitor's
+  rate. The RX 9070 XT drives two active outputs, `\\.\DISPLAY1` at 1920x1080
+  60 Hz (primary) and `\\.\DISPLAY2` at 1920x1080 75 Hz. `GetWindowRect` and
+  `MonitorFromWindow` placed the diagnostic window at 632,269-1288,788, wholly
+  inside `DISPLAY1`'s 0,0-1920,1080 bounds during both intervals, matching the
+  display SDL reported.
+- The composition clock runs at 75.0 Hz. Repeated `DwmFlush` waits, which return
+  on the next DWM composition, gave 225 waits at 75.0 per second with a
+  13.352 ms median gap (p10 12.401 ms, p90 14.244 ms). Interval-1 submissions
+  and mean elapsed swap time (74.8/s, 13.300 ms) track that cadence rather than
+  the 16.667 ms of a 60 Hz refresh. `DwmGetCompositionTimingInfo` returned
+  `DWM_E_NOT_QUEUING_PRESENTS` here, so DWM's own `rateRefresh` was unavailable.
+- This is consistent with windowed WGL interval-1 pacing following the DWM
+  composition/present path instead of the window monitor's mode, which fits how
+  mixed-refresh desktops compose at the highest active refresh
+  ([Chromium's DWM note](https://issues.chromium.org/issues/40273080) reports
+  `DwmGetCompositionTimingInfo` returning DWM's highest rate in such setups).
+  It is correlation, not proof: one 75 Hz observation cannot separate DWM
+  queueing from a driver or control-panel VSync override, submissions are not
+  displayed frames, and no physical refresh, tear line or display output was
+  observed.
+- Separating those requires repeating the comparison with only the 60 Hz output
+  active, or with both outputs at one rate, which changes display configuration
+  and was not performed, plus external observation or capture. Physical VSync
+  and the Windows/Linux desktop gates remain open.
 - CI on `b99eede` passed on Linux and Windows in
   [run 45222728304](https://github.com/atlasnail/peridot-engine/actions/runs/45222728304).
   Linux Debug, ASan+UBSan and Release builds and CTest passed, as did static
