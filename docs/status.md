@@ -14,13 +14,65 @@ Last updated: 2026-11-25
   (`peri::SdlSession`), so shutdown is deterministic. The opt-in GL context
   and swap-control groundwork exists, but clear, desktop and hardware checks,
   and a real CPU-time measurement remain open.
+- **Physical-VSync evidence:** the exclusive-fullscreen diagnostic reports
+  interval 1 at the read-back 60 Hz mode on Windows, with interval 0 and 2
+  controls behaving as expected, but no capture exists, so physical VSync is
+  unverified and M1 stays open.
 - Version `0.1.0-dev`; implementation: core and SDL3 platform, tests and
   `bench_blank`. No game renderer or audio.
 - The existing remote is `https://github.com/atlasnail/engine.git`. The rename
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 swap-interval diagnostic
+## Latest session: M1 exclusive-fullscreen alternation diagnostic
+
+- Ran the new `window_opengl_alternation_manual` diagnostic once on 2026-11-25
+  after asking for approval, because it switches the window to exclusive
+  fullscreen. Windows 11 Pro 10.0.26200, MSVC Debug, AMD Radeon RX 9070 XT,
+  OpenGL 3.3 core driver `26.11.1.261109`, SDL `windows` video driver. Command:
+  `PERI_TEST_OPENGL_ALTERNATION=1
+  PERI_TEST_OPENGL_ALTERNATION_CSV=benchmarks/results/windows-alternation-2026-11-25.csv
+  build/windows-debug/bin/peri_platform_tests.exe window_opengl_alternation_manual`.
+  Exit 0, one case, 20 checks, none failed, no case skipped.
+- The applied mode was `24N5C`, 1920x1080, read back as `60/1`, i.e. 60.0000 Hz
+  exactly, which the rounded `refresh_rate` float cannot express. The window
+  reported the same 1920x1080 pixels and stayed in exclusive mode through every
+  phase. The run selected the desktop's own mode, so no resolution or refresh had
+  to be undone, and the desktop was confirmed back at 1920x1080 afterwards.
+- Per-interval submissions from the logged steady window (0.5 s warm-up, then
+  4 s; `rows` are the CSV rows in that window):
+
+| Interval | Rows | Rate | Median gap | p10 gap | p90 gap |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 240 | 59.94/s | 13.480 ms | 12.890 ms | 26.765 ms |
+| 0 | 14,070 | 3517.71/s | 0.250 ms | 0.235 ms | 0.336 ms |
+| 2 | 120 | 29.94/s | 36.252 ms | 26.743 ms | 39.969 ms |
+
+- With interval 1 the submission rate follows the selected 60 Hz mode (59.94/s,
+  0.1 % under the read-back value) rather than the 74.8/s the windowed diagnostic
+  measured on the same machine, interval 2 halves it to 29.94/s, and interval 0
+  runs at 3517/s. The composition clamp recorded in the session below does not
+  survive exclusive fullscreen, which is the first software-level evidence that
+  the ~75 Hz pacing came from DWM composition rather than the driver.
+- The interval-1 gaps are not a smooth 16.667 ms cadence: the median is 13.480 ms
+  with a 26.765 ms p90, a bimodal pattern that only averages to the 60 Hz rate.
+  A present queue releasing frames in bursts produces exactly this, and submission
+  timestamps cannot tell which frame was displayed when; only a capture can.
+- The CSV holds `interval,submission,wall_seconds,elapsed_seconds,background`,
+  14,430 rows covering 3.999 s, 3.987 s and 3.974 s of steady time. Each phase's
+  wall-clock span matched its steady span, so a camera recording can be aligned by
+  `wall_seconds` (system clock) and matched frame by frame. The log is committed
+  at `benchmarks/results/windows-alternation-2026-11-25.csv`; it is a submission
+  log, not evidence of physical VSync, and no capture accompanies it.
+- What this run does not establish: physical VSync. The panel's real scan rate
+  was not measured, no tear line was checked, and nothing observed a displayed
+  frame. The bimodal interval-1 gaps are consistent with both a queued but
+  synchronized present path and a driver-pacing artifact. The other output was
+  still active at 75 Hz, VRR state was not inspected, and only one run was made,
+  not the two the method asks for. M1 remains open on both platforms and no
+  exception has been requested.
+
+## Previous session: M1 swap-interval diagnostic
 
 - Added the separately opt-in, test-only `window_opengl_swap_interval_manual`.
   It compares requested intervals 0 and 1 in a visible window using a moving
@@ -112,12 +164,13 @@ Last updated: 2026-11-25
   not failed, when the driver does not accept it.
 - `Window::toggle_fullscreen()` still means borderless desktop fullscreen, and no
   production path selects exclusive mode; the hook exists only for measurement.
-- The diagnostic has not been run, because it changes the display mode by design
-  and that needs approval first. It builds under MSVC Debug, the full local suite
-  passes and its case skips without the environment variable, and it is not
-  enabled in CI. The existing diagnostics still cannot satisfy the gate, since a
-  DWM-composited window cannot tear. Physical VSync therefore remains unverified
-  on both platforms, not merely unrecorded, and no exception has been requested.
+- At that point the diagnostic had not been run, because it changes the display
+  mode by design and that needed approval first; it has since been run once (see
+  the session above). It builds under MSVC Debug, the full local suite passes and
+  its case skips without the environment variable, and it is not enabled in CI.
+  The windowed diagnostics still cannot satisfy the gate, since a DWM-composited
+  window cannot tear, so physical VSync remained unverified on both platforms and
+  no exception has been requested.
 - CI on `b99eede` passed on Linux and Windows in
   [run 45222728304](https://github.com/atlasnail/peridot-engine/actions/runs/45222728304).
   Linux Debug, ASan+UBSan and Release builds and CTest passed, as did static
