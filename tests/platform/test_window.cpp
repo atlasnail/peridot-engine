@@ -427,39 +427,46 @@ TEST_CASE(window_opengl_alternation_manual) {
                                : "peri_alternation.csv";
     CsvFile csv;
     REQUIRE(open_csv(&csv.file, csv_path));
-    std::fprintf(csv.file, "interval,submission,wall_seconds,elapsed_seconds,background\n");
+    std::fprintf(csv.file, "phase,interval,submission,wall_seconds,elapsed_seconds,background\n");
     std::printf("Frame timestamps: %s (wall_seconds is system_clock; compare it with the "
                 "capture)\n",
                 csv_path);
     std::printf("Film this screen at 240 fps or more for capture evidence. The background "
                 "alternates black and white four times a second; each phase warms up 0.5 s, "
                 "then logs 4 s. Interval 1 should pace at the read-back refresh, 0 should not, "
-                "2 should halve it. This run alone does not verify physical VSync.\n");
+                "2 should halve it, and the last phase repeats interval 1 so its spacing can be "
+                "compared within one session. This run alone does not verify physical VSync.\n");
     std::fflush(stdout);
     glDrawBuffer(GL_BACK);
     REQUIRE(glGetError() == GL_NO_ERROR);
 
     using Clock = std::chrono::steady_clock;
-    const int intervals[] = {1, 0, 2};
+    // The interval-1 repeat at the end tests whether the first phase's spacing
+    // depended on the display still settling after the mode switch.
+    const int intervals[] = {1, 0, 2, 1};
+    constexpr int phase_count = static_cast<int>(sizeof(intervals) / sizeof(intervals[0]));
     peri::InputState input;
     bool measured_any = false;
-    for (const int interval : intervals) {
+    for (int phase = 1; phase <= phase_count; ++phase) {
+        const int interval = intervals[phase - 1];
+        const bool repeat = phase > 1 && interval == 1;
         const peri::Result<int> applied =
             peri::platform::detail::set_test_swap_interval(*window, interval);
         if (applied.is_error()) {
-            std::printf("Interval %d: not set (%s); phase skipped\n", interval,
+            std::printf("Phase %d (interval %d): not set (%s); phase skipped\n", phase, interval,
                         applied.error().message);
             continue;
         }
         if (applied.value() != interval) {
-            std::printf("Interval %d: driver applied %d; phase skipped\n", interval,
-                        applied.value());
+            std::printf("Phase %d (interval %d): driver applied %d; phase skipped\n", phase,
+                        interval, applied.value());
             continue;
         }
         char title[64]{};
-        std::snprintf(title, sizeof(title), "Peridot alternation: interval %d", interval);
+        std::snprintf(title, sizeof(title), "Peridot alternation: phase %d", phase);
         window->set_title(title);
-        std::printf("Interval %d: measuring 4 s after a 0.5 s warm-up\n", interval);
+        std::printf("Phase %d (interval %d%s): measuring 4 s after a 0.5 s warm-up\n", phase,
+                    interval, repeat ? ", repeat" : "");
         std::fflush(stdout);
 
         const auto start = Clock::now();
@@ -492,21 +499,23 @@ TEST_CASE(window_opengl_alternation_manual) {
             glClearColor(white ? 1.0f : 0.0f, white ? 1.0f : 0.0f, white ? 1.0f : 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
             if (glGetError() != GL_NO_ERROR) {
-                std::printf("Interval %d: GL error during clear; phase stopped\n", interval);
+                std::printf("Phase %d (interval %d): GL error during clear; phase stopped\n", phase,
+                            interval);
                 phase_complete = false;
                 break;
             }
             const auto wall = std::chrono::system_clock::now();
             if (!window->swap_buffers().is_ok()) {
-                std::printf("Interval %d: swap failed; phase stopped\n", interval);
+                std::printf("Phase %d (interval %d): swap failed; phase stopped\n", phase,
+                            interval);
                 phase_complete = false;
                 break;
             }
             if (now >= measurement_start) {
                 const double wall_seconds =
                     std::chrono::duration<double>(wall.time_since_epoch()).count();
-                std::fprintf(csv.file, "%d,%llu,%.6f,%.6f,%s\n", interval, frames, wall_seconds,
-                             elapsed, white ? "white" : "black");
+                std::fprintf(csv.file, "%d,%d,%llu,%.6f,%.6f,%s\n", phase, interval, frames,
+                             wall_seconds, elapsed, white ? "white" : "black");
                 if (have_previous && white != previous_white) {
                     ++changes;
                 }
@@ -521,13 +530,13 @@ TEST_CASE(window_opengl_alternation_manual) {
             std::chrono::duration<double>(Clock::now() - measurement_start).count();
         CHECK(SDL_GetWindowFullscreenMode(native) != nullptr);
         if (frames > 0 && measured > 0.0) {
-            std::printf("Interval %d: %llu submissions in %.3f s (%.1f/s), %llu background "
-                        "changes\n",
-                        interval, frames, measured, static_cast<double>(frames) / measured,
-                        changes);
+            std::printf("Phase %d (interval %d%s): %llu submissions in %.3f s (%.1f/s), %llu "
+                        "background changes\n",
+                        phase, interval, repeat ? ", repeat" : "", frames, measured,
+                        static_cast<double>(frames) / measured, changes);
             measured_any = true;
         } else if (phase_complete) {
-            std::printf("Interval %d: no submissions logged\n", interval);
+            std::printf("Phase %d (interval %d): no submissions logged\n", phase, interval);
         }
         std::fflush(csv.file);
     }

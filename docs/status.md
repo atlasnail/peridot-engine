@@ -14,17 +14,51 @@ Last updated: 2026-11-25
   (`peri::SdlSession`), so shutdown is deterministic. The opt-in GL context
   and swap-control groundwork exists, but clear, desktop and hardware checks,
   and a real CPU-time measurement remain open.
-- **Physical-VSync evidence:** two exclusive-fullscreen runs put interval 1 at
-  59.94/s and 60.00/s against a read-back 60 Hz mode, with the 0 and 2 controls
-  scaling as expected, but the interval-1 gap distribution differed between the
-  runs and no capture exists, so physical VSync is unverified and M1 stays open.
+- **Physical-VSync evidence:** four exclusive-fullscreen runs pace interval 1
+  within 0.1 % of a read-back 60 Hz mode, including an interval-1 repeat after
+  the 0/2 controls, but the first run's bimodal spacing never recurred and no
+  capture exists, so physical VSync is unverified and M1 stays open.
 - Version `0.1.0-dev`; implementation: core and SDL3 platform, tests and
   `bench_blank`. No game renderer or audio.
 - The existing remote is `https://github.com/atlasnail/engine.git`. The rename
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 alternation rerun
+## Latest session: M1 alternation interval-1 repeat
+
+- `window_opengl_alternation_manual` now runs four phases in one session:
+  intervals 1, 0, 2, then interval 1 again, and its CSV gained a leading `phase`
+  column (`phase,interval,submission,wall_seconds,elapsed_seconds,background`).
+  The two earlier CSVs keep the five-column form. Twenty-one checks, exit 0.
+- Ran it twice on 2026-11-25 with approval asked before each switch, same machine
+  and display: Windows 11 Pro 10.0.26200, MSVC Debug, RX 9070 XT driver
+  `26.11.1.261109`, `24N5C` read back as `60/1` = 60.0000 Hz, desktop back at
+  1920x1080 after each pass. CSVs:
+  `benchmarks/results/windows-alternation-2026-11-25-repeat-a.csv` and
+  `...-repeat-b.csv`.
+
+| Pass | Phase 1 (interval 1) | Phase 4 (interval 1, repeat) | Phase 2 (interval 0) | Phase 3 (interval 2) |
+| --- | --- | --- | --- | --- |
+| A | 16.655 ms median (16.251/17.051), 59.99/s | 16.660 ms (16.314/17.029), 60.00/s | 4516.82/s | 33.332 ms, 30.00/s |
+| B | 16.662 ms median (16.291/17.052), 60.00/s | 16.667 ms (16.392/16.943), 60.00/s | 4551.16/s | 33.342 ms, 30.00/s |
+
+- The repeat phase matches the first phase in both passes and both are uniform at
+  16.66 ms, so there is no settling difference to observe: the first interval-1
+  phase after the mode switch already showed the settled cadence. The bimodal
+  spacing of the very first run was therefore not a warm-up transient.
+- Across four exclusive-fullscreen runs the interval-1 spacing was bimodal once
+  (13.480 ms median, 26.765 ms p90) and uniform three times, while the rate
+  stayed within 0.1 % of the read-back mode every time.
+- What this establishes: in exclusive fullscreen the submission cadence follows
+  the selected 60 Hz mode from the first phase on, with the 0 and 2 controls
+  scaling as expected, in four runs. What it does not establish: physical VSync.
+  Nothing captured the screen or measured the panel; a uniform 16.66 ms
+  submission cadence is what vblank-locked presentation looks like, but it is
+  also what a driver limiter using the mode rate produces. VRR state, the second
+  output and a named witness remain unaddressed, M1 stays open and no exception
+  has been requested.
+
+## Previous session: M1 alternation rerun
 
 - Ran `window_opengl_alternation_manual` a second time on 2026-11-25 after asking
   first, on the same machine, build and display: Windows 11 Pro 10.0.26200, MSVC
@@ -85,7 +119,7 @@ Last updated: 2026-11-25
   the ~75 Hz pacing came from DWM composition rather than the driver.
 - The interval-1 gaps in this run were not a smooth 16.667 ms cadence: the
   median was 13.480 ms with a 26.765 ms p90, a bimodal pattern averaging to the
-  60 Hz rate. It did not reproduce in the rerun above, so it is recorded as a
+  60 Hz rate. It did not reproduce in any later run, so it is recorded as a
   single-run observation; submission timestamps cannot say which frame was
   displayed when, and only a capture can.
 - The CSV holds `interval,submission,wall_seconds,elapsed_seconds,background`,
