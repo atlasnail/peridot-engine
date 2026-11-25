@@ -14,8 +14,8 @@ Last updated: 2026-11-25
   (`peri::SdlSession`), so shutdown is deterministic. The opt-in GL context
   and swap-control groundwork exists, but clear, desktop and hardware checks,
   and a real CPU-time measurement remain open.
-- **Physical-VSync evidence:** nine exclusive-fullscreen runs, one with only
-  the 60 Hz output active and three from the Release build, pace interval 1
+- **Physical-VSync evidence:** eleven exclusive-fullscreen runs, three with
+  only the 60 Hz output active and three from the Release build, pace interval 1
   within 0.1 % of a read-back 60 Hz mode, while a windowed control still paces at
   74.8/s; no capture exists, so physical VSync is unverified and M1 stays open.
 - Version `0.1.0-dev`; implementation: core and SDL3 platform, tests and
@@ -37,11 +37,20 @@ Last updated: 2026-11-25
   and interval 0 1436.18/s. The exclusive rate therefore does not depend on the
   75 Hz output being present, which the two-output runs implied and this control
   confirms.
-- The spacing was looser than in the two-output runs: p10 12.896 ms and p90
-  20.548 ms around a 16.674 ms median, against 16.2-17.1 ms there. One run taken
-  immediately after a topology and mode switch cannot separate a settling
-  transient from ordinary variance, and it was not repeated, so it is recorded as
-  an observation rather than a result.
+- The spacing was looser than in the two-output runs, and repeating the
+  single-output run twice confirmed it rather than dissolving it. Three runs at
+  interval 1 gave medians of 16.674, 16.713 and 16.641 ms against the 16.667 ms of
+  a 60 Hz mode, but with far heavier tails than the two-output runs: p10
+  8.331-14.817 ms and p90 18.476-24.299 ms, where the two-output runs stayed
+  inside 16.2-17.1 ms. Interval 2 widened the same way (p10 25.899-31.923, p90
+  34.479-40.354). The rate is unaffected; the jitter is reproducible in this
+  configuration and its cause is not established.
+- The three single-output repeats are in
+  `benchmarks/results/windows-alternation-2026-11-25-single-output.csv`,
+  `-2.csv` and `-3.csv`. The difference only merits follow-up if it survives a
+  longer run: the median is correct every time and nothing here says which frame
+  reached the panel, so queue depth, DWM on a single output and ordinary
+  scheduling all remain possible.
 - Physical VSync remains unclaimed: these are submissions, with no capture, no
   panel measurement and no tear check. M1 stays open and no exception was
   requested.
