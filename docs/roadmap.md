@@ -63,13 +63,59 @@ Sizes are planning aids for a solo developer working part-time, not commitments.
 | 1.6 | File system basics: UTF-8 paths, base path discovery, read/write directory creation, atomic file replace | P0 | Used by saves and assets later. |
 | 1.7 | Logging sink to console + rotating file; crash-safe flush policy | P1 | No hot-path formatting cost when disabled. |
 | 1.8 | Frame stats overlay (text-only, no font dependency yet) and CSV frame log | P1 | Needed for benchmark M1 gate. |
+| 1.9 | Physical-VSync evidence run: compositor-free fullscreen, external capture, interval controls | P0 | Method below; archive in `benchmarks/results/`. |
 
 **Exit criteria**
 - Same binary behavior on Windows and Linux: window, resize, fullscreen, focus loss, clean exit.
 - Input actions work for keyboard, mouse and gamepad; mapping is data-driven and documented.
 - Resize to 0×0 (minimize) does not crash or spin.
 - **Performance gates** (Tier A hardware, Release, VSync off, 60 s run after 5 s warm-up): empty frame CPU time **p99 ≤ 0.3 ms**, no frame > 2× target, private memory **≤ 60 MB**. Recorded in `benchmarks/`.
+- Physical VSync verified by the evidence method below on at least one Tier A
+  machine, or an approved exception recorded in `docs/status.md`.
 - Clean shutdown with zero leaks and no driver warnings on both platforms.
+
+**Physical-VSync evidence (unobserved)**
+
+A composited window cannot show this. As recorded in `docs/status.md`, a
+DWM-composited window is paced by the composition clock, which follows the
+fastest active output, so interval-1 submissions describe the desktop rather
+than the panel. Submission counts, `SDL_GL_GetSwapInterval` values, and the
+absence of tearing in a windowed app are therefore not evidence, whatever they
+report.
+
+One run must supply all of the following:
+
+1. **A display path outside the compositor.** Windows: exclusive fullscreen
+   with an explicitly selected `SDL_DisplayMode`; the refresh is read back from
+   `refresh_rate_numerator`/`refresh_rate_denominator` and, where available, the
+   platform path, never from the integer `dmDisplayFrequency` alone.
+   Linux: KMS/DRM, or an X11 fullscreen window with no compositor running; state
+   which was used. VRR/FreeSync, Windows dynamic refresh and panel self-refresh
+   are disabled or explicitly reported, because they decouple the panel rate
+   from the mode.
+2. **Presentation measured off the CPU.** A camera at ≥ 240 fps (phone slow
+   motion is acceptable) filming a full-screen alternation, archived together
+   with the app-side timestamp log for the same frames; or a photodiode or
+   light sensor on the panel feeding an oscilloscope or audio input. The capture
+   must resolve edges to better than one panel period. Driver-side counters
+   (`WGL_OML_sync_control`/`glXGetSyncValuesOML` ust/msc/sbc, presentation
+   statistics) are supporting evidence only, never the primary record.
+3. **Interval controls in the same configuration and session.** Interval 1 at
+   the panel rate, interval 0 clearly unthrottled, interval 2 halving the
+   observed presentation rate. A rate that does not move with the interval is a
+   limiter, not synchronization.
+4. **A named witness and a platform record.** GPU, driver, display model,
+   connection, OS build, exact command and environment variables, capture
+   device and its frame rate, and the measured rates. Store the capture and log
+   under `benchmarks/results/` and summarize the result, the observer and the
+   date in `docs/status.md`.
+
+Passing means the captured presentation cadence matches the reported mode within
+the capture's resolution (target within 0.5 %, reproduced in two runs), no torn
+frame or mid-frame edge appears in the capture, and the interval controls behave
+as above. A machine that cannot provide exclusive fullscreen or a capture is an
+approved exception written into `docs/status.md`, never a silent pass, and the
+status stays "unverified" until a record of this kind exists.
 
 **Docs:** `docs/architecture.md` platform section, input mapping format, benchmark record.
 

@@ -86,6 +86,23 @@ Last updated: 2026-11-25
   control-panel VSync override; both outputs were never forced to one rate and
   VRR state was not inspected. Physical VSync and the Windows/Linux desktop
   gates remain open.
+- The M1 physical-VSync method is now written into `docs/roadmap.md` as roadmap
+  item 1.9 and an M1 exit criterion, so it is a defined gate rather than a vague
+  note. One run must provide: a compositor-free display path (Windows exclusive
+  fullscreen with a read-back path refresh; Linux KMS/DRM or uncomposited
+  fullscreen) with VRR, dynamic refresh and panel self-refresh off or reported;
+  presentation captured off the CPU by a camera at 240 fps or faster, or a panel
+  photodiode, archived with the app-side frame log; interval 1/0/2 controls in
+  the same session; and a named witness with the full platform record stored
+  under `benchmarks/results/`. It passes only if the captured cadence matches
+  the reported mode within 0.5 % across two runs with no torn frame.
+- None of that has been run, and the capability it assumes does not exist yet:
+  the platform layer has only `toggle_fullscreen()` (roadmap item 1.5), with no
+  exclusive-mode selection, no read-back of the platform path refresh and no
+  full-screen alternation mode. The existing diagnostics cannot satisfy the gate
+  either, because a DWM-composited window cannot tear. Physical VSync therefore
+  remains unverified on both platforms, not merely unrecorded, and no exception
+  has been requested.
 - CI on `b99eede` passed on Linux and Windows in
   [run 45222728304](https://github.com/atlasnail/peridot-engine/actions/runs/45222728304).
   Linux Debug, ASan+UBSan and Release builds and CTest passed, as did static
@@ -95,9 +112,10 @@ Last updated: 2026-11-25
 - To repeat from Git Bash, use `PERI_TEST_OPENGL_SWAP_INTERVAL=1
   build/windows-debug/bin/peri_platform_tests.exe window_opengl_swap_interval_manual`.
   The window title identifies each interval. Keep it on the selected display and
-  unminimized. The diagnostic has no physical-VSync pass criterion: confirmation
-  requires external observation/capture and a valid off-phase control. M1 remains
-  open and no M2 renderer was added.
+  unminimized. The diagnostic has no physical-VSync pass criterion: a
+  DWM-composited window cannot tear, so confirmation is the separate method in
+  `docs/roadmap.md` (M1 physical-VSync evidence) and M1 remains open. No M2
+  renderer was added.
 
 ## Previous session: visible M1 GL diagnostic
 
