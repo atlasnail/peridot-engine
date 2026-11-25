@@ -14,18 +14,50 @@ Last updated: 2026-11-25
   (`peri::SdlSession`), so shutdown is deterministic. The opt-in GL context
   and swap-control groundwork exists, but clear, desktop and hardware checks,
   and a real CPU-time measurement remain open.
-- **Physical-VSync evidence:** five exclusive-fullscreen runs pace interval 1
-  within 0.1 % of a read-back 60 Hz mode, including an interval-1 repeat after
-  the 0/2 controls and a run whose frame marker decoded correctly, but the first
-  run's bimodal spacing never recurred and no capture exists, so physical VSync
-  is unverified and M1 stays open.
+- **Physical-VSync evidence:** eight exclusive-fullscreen runs pace interval 1
+  within 0.1 % of a read-back 60 Hz mode, three of them from the Release build,
+  and a windowed control in the same session still paces at 74.8/s, but no
+  capture exists, so physical VSync is unverified and M1 stays open.
 - Version `0.1.0-dev`; implementation: core and SDL3 platform, tests and
   `bench_blank`. No game renderer or audio.
 - The existing remote is `https://github.com/atlasnail/engine.git`. The rename
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 marker run
+## Latest session: M1 Release runs and a paired windowed control
+
+- Built and tested `windows-release` this session (configure, build and CTest
+  clean), then ran the marker-enabled diagnostic three times from it. `24N5C`
+  still read back `60/1` and all three exited 0. CSVs:
+  `benchmarks/results/windows-alternation-2026-11-25-release-1.csv` through
+  `-release-3.csv`.
+
+| Run | Interval-1 phase 1 | Interval-1 repeat | Interval 0 | Interval 2 |
+| --- | --- | --- | --- | --- |
+| 1 | 58.75/s, 16.691 ms | 60.00/s, 16.698 ms | 1803/s | 30.00/s |
+| 2 | 59.99/s, 16.712 ms | 59.93/s, 16.585 ms | 1858/s | 30.00/s |
+| 3 | 59.98/s, 16.649 ms | 60.00/s, 16.636 ms | 872/s | 30.01/s |
+
+- Data audit over those CSVs: every phase's `submission` is contiguous by one,
+  every `background` value matches the 4 Hz alternation recomputed from
+  `elapsed_seconds`, and wall-versus-steady drift stays under 8 ms except one
+  147 ms outlier in run 1 phase 1, where the system clock moved against the
+  monotonic clock. The index and the alternation are self-consistent; wall time
+  is usable per row but not as a difference base.
+- The unthrottled phase is now 872-1858/s rather than the 3500-4850/s seen before
+  the marker existed: ten clears per frame make that phase a clear-throughput
+  control rather than a swap-headroom measurement. It remains far above 60 Hz,
+  so it still separates synchronized from unsynchronized pacing.
+- Paired windowed control in the same session: `window_opengl_swap_interval_manual`
+  reports 74.8 submissions/s at interval 1 (13.267 ms mean elapsed call) and
+  4558/s at interval 0, with `24N5C` reporting 60.000 Hz. Exclusive fullscreen
+  in the same session gives 60.00/s, so the composition clamp is reproducible on
+  demand windowed and absent exclusive.
+- All eight exclusive-fullscreen runs and this control measure submissions only.
+  No capture, panel measurement or tear check exists, physical VSync stays
+  unverified on both platforms, M1 stays open and no exception was requested.
+
+## Previous session: M1 marker run
 
 - Ran the marker-enabled diagnostic once on 2026-11-25 with approval: Windows 11
   Pro 10.0.26200, MSVC Debug, `24N5C` read back as `60/1` = 60.0000 Hz, desktop
