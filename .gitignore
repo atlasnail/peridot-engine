@@ -46,3 +46,7 @@ desktop.ini
 # Environment/secrets (never commit these)
 .env
 .dev.vars
+
+# Default log path of the alternation diagnostic when it is run without
+# PERI_TEST_OPENGL_ALTERNATION_CSV; recorded runs live in benchmarks/results/.
+peri_alternation.csv

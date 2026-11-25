@@ -140,12 +140,13 @@ Last updated: 2026-11-25
   16.66 ms, so there is no settling difference to observe: the first interval-1
   phase after the mode switch already showed the settled cadence. The bimodal
   spacing of the very first run was therefore not a warm-up transient.
-- Across four exclusive-fullscreen runs the interval-1 spacing was bimodal once
-  (13.480 ms median, 26.765 ms p90) and uniform three times, while the rate
-  stayed within 0.1 % of the read-back mode every time.
+- Across the four exclusive-fullscreen runs up to that point the interval-1
+  spacing was bimodal once (13.480 ms median, 26.765 ms p90) and uniform three
+  times, while the rate stayed within 0.1 % of the read-back mode every time.
 - What this establishes: in exclusive fullscreen the submission cadence follows
   the selected 60 Hz mode from the first phase on, with the 0 and 2 controls
-  scaling as expected, in four runs. What it does not establish: physical VSync.
+  scaling as expected, in the four runs then available. What it does not
+  establish: physical VSync.
   Nothing captured the screen or measured the panel; a uniform 16.66 ms
   submission cadence is what vblank-locked presentation looks like, but it is
   also what a driver limiter using the mode rate produces. VRR state, the second
