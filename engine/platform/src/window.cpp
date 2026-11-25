@@ -337,6 +337,128 @@ namespace platform::detail {
 void set_test_gl_profile_override(int profile) noexcept {
     g_test_gl_profile_override = profile;
 }
+
+Result<TestExclusiveMode> enter_test_exclusive_fullscreen(Window& window, int width, int height,
+                                                          float requested_hz) {
+    auto* handle = static_cast<SDL_Window*>(window.native_handle());
+    if (handle == nullptr) {
+        return Error{ErrorCode::internal_error, "window has no native handle"};
+    }
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(handle);
+    if (display == 0) {
+        return Error{ErrorCode::unsupported, "window is not on a display"};
+    }
+
+    // Without a requested size, use the desktop mode so the default run keeps
+    // the current resolution and only the display path changes.
+    int target_width = width;
+    int target_height = height;
+    float target_hz = requested_hz;
+    if (target_width <= 0 || target_height <= 0) {
+        const SDL_DisplayMode* desktop = SDL_GetDesktopDisplayMode(display);
+        if (desktop == nullptr) {
+            return Error{ErrorCode::unsupported, "could not query the desktop display mode"};
+        }
+        target_width = desktop->w;
+        target_height = desktop->h;
+        if (target_hz <= 0.0f) {
+            target_hz = desktop->refresh_rate;
+        }
+    }
+
+    int mode_count = 0;
+    SDL_DisplayMode** modes = SDL_GetFullscreenDisplayModes(display, &mode_count);
+    if (modes == nullptr || mode_count <= 0) {
+        if (modes != nullptr) {
+            SDL_free(modes);
+        }
+        return Error{ErrorCode::unsupported, "display reports no fullscreen modes"};
+    }
+
+    // Choose the mode explicitly: same size as requested, refresh closest to the
+    // target. The mode is copied because only the array is ours to free.
+    const SDL_DisplayMode* best = nullptr;
+    float best_distance = 0.0f;
+    for (int i = 0; i < mode_count; ++i) {
+        const SDL_DisplayMode* mode = modes[i];
+        if (mode == nullptr || mode->w != target_width || mode->h != target_height) {
+            continue;
+        }
+        const float distance = mode->refresh_rate > target_hz ? mode->refresh_rate - target_hz
+                                                              : target_hz - mode->refresh_rate;
+        if (best == nullptr || distance < best_distance) {
+            best = mode;
+            best_distance = distance;
+        }
+    }
+    SDL_DisplayMode requested_mode{};
+    if (best != nullptr) {
+        requested_mode = *best;
+    }
+    const bool found = best != nullptr;
+    SDL_free(modes);
+    if (!found) {
+        return Error{ErrorCode::unsupported, "no fullscreen mode matches the window size"};
+    }
+
+    if (!SDL_SetWindowFullscreenMode(handle, &requested_mode)) {
+        return Error{ErrorCode::unsupported, "could not select the fullscreen mode"};
+    }
+    if (!SDL_SetWindowFullscreen(handle, true)) {
+        SDL_SetWindowFullscreenMode(handle, nullptr);
+        return Error{ErrorCode::unsupported, "could not enter fullscreen"};
+    }
+    // The change may be asynchronous; wait so the read-back below is the applied
+    // state rather than the previous one.
+    SDL_SyncWindow(handle);
+
+    // A null read-back means the platform fell back to borderless desktop
+    // fullscreen, which stays composited and cannot show swap pacing.
+    const SDL_DisplayMode* applied = SDL_GetWindowFullscreenMode(handle);
+    if (applied == nullptr) {
+        SDL_SetWindowFullscreen(handle, false);
+        SDL_SetWindowFullscreenMode(handle, nullptr);
+        return Error{ErrorCode::unsupported, "platform did not apply exclusive fullscreen"};
+    }
+    if (applied->refresh_rate_numerator <= 0 || applied->refresh_rate_denominator <= 0) {
+        SDL_SetWindowFullscreen(handle, false);
+        SDL_SetWindowFullscreenMode(handle, nullptr);
+        return Error{ErrorCode::unsupported, "exclusive mode reports no precise refresh"};
+    }
+    return TestExclusiveMode{applied->w, applied->h, applied->refresh_rate_numerator,
+                             applied->refresh_rate_denominator};
+}
+
+bool leave_test_fullscreen(Window& window) noexcept {
+    auto* handle = static_cast<SDL_Window*>(window.native_handle());
+    if (handle == nullptr) {
+        return false;
+    }
+    const bool left = SDL_SetWindowFullscreen(handle, false);
+    // Clear the explicit mode so a later request is borderless desktop again.
+    const bool cleared = SDL_SetWindowFullscreenMode(handle, nullptr);
+    return left && cleared;
+}
+
+Result<int> set_test_swap_interval(Window& window, int interval) {
+    if (interval < 0) {
+        return Error{ErrorCode::invalid_argument, "swap interval must not be negative"};
+    }
+    const Status current = window.make_gl_current();
+    if (current.is_error()) {
+        return current.error();
+    }
+    if (!SDL_GL_SetSwapInterval(interval)) {
+        PERI_LOG_WARN("platform", "could not set swap interval %d: %s", interval, SDL_GetError());
+        return Error{ErrorCode::unsupported, "could not set swap interval"};
+    }
+    int applied = 0;
+    if (!SDL_GL_GetSwapInterval(&applied)) {
+        PERI_LOG_WARN("platform", "could not query swap interval: %s", SDL_GetError());
+        return Error{ErrorCode::unsupported, "could not query swap interval"};
+    }
+    return applied;
+}
 #endif
 
 void shutdown_devices() noexcept {

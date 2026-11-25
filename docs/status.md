@@ -96,13 +96,28 @@ Last updated: 2026-11-25
   the same session; and a named witness with the full platform record stored
   under `benchmarks/results/`. It passes only if the captured cadence matches
   the reported mode within 0.5 % across two runs with no torn frame.
-- None of that has been run, and the capability it assumes does not exist yet:
-  the platform layer has only `toggle_fullscreen()` (roadmap item 1.5), with no
-  exclusive-mode selection, no read-back of the platform path refresh and no
-  full-screen alternation mode. The existing diagnostics cannot satisfy the gate
-  either, because a DWM-composited window cannot tear. Physical VSync therefore
-  remains unverified on both platforms, not merely unrecorded, and no exception
-  has been requested.
+- The first test-only pieces of that method now exist, behind
+  `PERI_PLATFORM_TEST_HOOKS` so no production API changed: `platform::detail`
+  gained `enter_test_exclusive_fullscreen` (selects an explicit `SDL_DisplayMode`
+  on the window's display, refuses a borderless fallback or a mode without a
+  precise refresh, and returns the applied mode's `refresh_rate_numerator` and
+  `refresh_rate_denominator`), `leave_test_fullscreen`, and
+  `set_test_swap_interval`. On top sits the opt-in
+  `window_opengl_alternation_manual` diagnostic (`PERI_TEST_OPENGL_ALTERNATION=1`):
+  it enters exclusive fullscreen at the desktop size, then for intervals 1, 0 and
+  2 alternates the whole screen black and white four times a second for 4 s
+  after a 0.5 s warm-up and writes `peri_alternation.csv`
+  (`interval,submission,wall_seconds,elapsed_seconds,background`) so an external
+  capture can be matched to submissions frame by frame. Interval 2 is skipped,
+  not failed, when the driver does not accept it.
+- `Window::toggle_fullscreen()` still means borderless desktop fullscreen, and no
+  production path selects exclusive mode; the hook exists only for measurement.
+- The diagnostic has not been run, because it changes the display mode by design
+  and that needs approval first. It builds under MSVC Debug, the full local suite
+  passes and its case skips without the environment variable, and it is not
+  enabled in CI. The existing diagnostics still cannot satisfy the gate, since a
+  DWM-composited window cannot tear. Physical VSync therefore remains unverified
+  on both platforms, not merely unrecorded, and no exception has been requested.
 - CI on `b99eede` passed on Linux and Windows in
   [run 45222728304](https://github.com/atlasnail/peridot-engine/actions/runs/45222728304).
   Linux Debug, ASan+UBSan and Release builds and CTest passed, as did static

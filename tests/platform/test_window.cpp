@@ -33,6 +33,27 @@ bool using_dummy_driver() {
 #endif
 }
 
+// Closes a timestamp log on every exit path, including REQUIRE returns.
+struct CsvFile {
+    std::FILE* file = nullptr;
+
+    ~CsvFile() {
+        if (file != nullptr) {
+            std::fclose(file);
+        }
+    }
+};
+
+// fopen is deprecated by MSVC's CRT, which treats the warning as an error.
+bool open_csv(std::FILE** file, const char* path) {
+#if defined(_WIN32)
+    return fopen_s(file, path, "wb") == 0;
+#else
+    *file = std::fopen(path, "wb");
+    return *file != nullptr;
+#endif
+}
+
 }  // namespace
 
 TEST_CASE(window_rejects_invalid_size) {
@@ -343,6 +364,182 @@ TEST_CASE(window_opengl_swap_interval_manual) {
     REQUIRE(complete);
     std::printf(
         "Timing and swap interval settings do not verify physical display synchronization.\n");
+}
+
+TEST_CASE(window_opengl_alternation_manual) {
+    const char* requested = SDL_getenv("PERI_TEST_OPENGL_ALTERNATION");
+    if (requested == nullptr || std::strcmp(requested, "1") != 0) {
+        SKIP_TEST("set PERI_TEST_OPENGL_ALTERNATION=1 on a GL desktop; it takes the display "
+                  "exclusive");
+    }
+    peri::WindowConfig config;
+    config.title = "Peridot GL alternation diagnostic";
+    config.width = 640;
+    config.height = 480;
+    config.opengl = true;
+    config.vsync = false;
+    auto result = peri::Window::create(config);
+    REQUIRE(result.is_ok());
+    auto window = std::move(result.value());
+    REQUIRE(window->make_gl_current().is_ok());
+    REQUIRE(gladLoadGL(SDL_GL_GetProcAddress) != 0);
+    const auto* renderer = glGetString(GL_RENDERER);
+    const auto* version = glGetString(GL_VERSION);
+    const char* video_driver = SDL_GetCurrentVideoDriver();
+    REQUIRE(renderer != nullptr);
+    REQUIRE(version != nullptr);
+    REQUIRE(video_driver != nullptr);
+    auto* native = static_cast<SDL_Window*>(window->native_handle());
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(native);
+    REQUIRE(display != 0);
+    const char* display_name = SDL_GetDisplayName(display);
+    REQUIRE(display_name != nullptr);
+
+    // An explicit mode on this display: its desktop size and refresh. The helper
+    // refuses when the platform falls back to borderless fullscreen, which stays
+    // composited and cannot show swap pacing. A failure here leaves the window
+    // windowed, so a skipped run changes nothing about the desktop.
+    const auto exclusive =
+        peri::platform::detail::enter_test_exclusive_fullscreen(*window, 0, 0, 0.0f);
+    if (exclusive.is_error()) {
+        std::printf("Exclusive fullscreen unavailable: %s\n", exclusive.error().message);
+        SKIP_TEST("exclusive fullscreen is unavailable on this display path");
+    }
+    const auto mode = exclusive.value();
+    REQUIRE(window->is_fullscreen());
+    const peri::IVec2 pixels = window->size_pixels();
+    CHECK(pixels.x == mode.width);
+    CHECK(pixels.y == mode.height);
+    REQUIRE(mode.refresh_numerator > 0);
+    REQUIRE(mode.refresh_denominator > 0);
+    const double refresh_hz =
+        static_cast<double>(mode.refresh_numerator) / static_cast<double>(mode.refresh_denominator);
+    std::printf("Alternation diagnostic: %s; %s; SDL video driver: %s\n",
+                reinterpret_cast<const char*>(renderer), reinterpret_cast<const char*>(version),
+                video_driver);
+    std::printf("Exclusive fullscreen: %s, %dx%d, read-back mode %d/%d (%.4f Hz)\n", display_name,
+                mode.width, mode.height, mode.refresh_numerator, mode.refresh_denominator,
+                refresh_hz);
+
+    const char* csv_requested = SDL_getenv("PERI_TEST_OPENGL_ALTERNATION_CSV");
+    const char* csv_path = csv_requested != nullptr && csv_requested[0] != '\0'
+                               ? csv_requested
+                               : "peri_alternation.csv";
+    CsvFile csv;
+    REQUIRE(open_csv(&csv.file, csv_path));
+    std::fprintf(csv.file, "interval,submission,wall_seconds,elapsed_seconds,background\n");
+    std::printf("Frame timestamps: %s (wall_seconds is system_clock; compare it with the "
+                "capture)\n",
+                csv_path);
+    std::printf("Film this screen at 240 fps or more for capture evidence. The background "
+                "alternates black and white four times a second; each phase warms up 0.5 s, "
+                "then logs 4 s. Interval 1 should pace at the read-back refresh, 0 should not, "
+                "2 should halve it. This run alone does not verify physical VSync.\n");
+    std::fflush(stdout);
+    glDrawBuffer(GL_BACK);
+    REQUIRE(glGetError() == GL_NO_ERROR);
+
+    using Clock = std::chrono::steady_clock;
+    const int intervals[] = {1, 0, 2};
+    peri::InputState input;
+    bool measured_any = false;
+    for (const int interval : intervals) {
+        const peri::Result<int> applied =
+            peri::platform::detail::set_test_swap_interval(*window, interval);
+        if (applied.is_error()) {
+            std::printf("Interval %d: not set (%s); phase skipped\n", interval,
+                        applied.error().message);
+            continue;
+        }
+        if (applied.value() != interval) {
+            std::printf("Interval %d: driver applied %d; phase skipped\n", interval,
+                        applied.value());
+            continue;
+        }
+        char title[64]{};
+        std::snprintf(title, sizeof(title), "Peridot alternation: interval %d", interval);
+        window->set_title(title);
+        std::printf("Interval %d: measuring 4 s after a 0.5 s warm-up\n", interval);
+        std::fflush(stdout);
+
+        const auto start = Clock::now();
+        const auto measurement_start = start + std::chrono::milliseconds(500);
+        unsigned long long frames = 0;
+        unsigned long long changes = 0;
+        bool have_previous = false;
+        bool previous_white = false;
+        bool phase_complete = true;
+        while (true) {
+            window->pump_events(input);
+            if (window->should_close() || window->is_minimized() || !window->is_fullscreen()) {
+                phase_complete = false;
+                break;
+            }
+            const auto now = Clock::now();
+            const double elapsed = std::chrono::duration<double>(now - start).count();
+            if (elapsed >= 4.5) {
+                break;
+            }
+            const peri::IVec2 size = window->size_pixels();
+            if (size.x <= 0 || size.y <= 0) {
+                phase_complete = false;
+                break;
+            }
+            // Four full black/white cycles a second: slow enough for a 240 fps
+            // capture to resolve every edge, fast enough to expose a tear.
+            const bool white = static_cast<long long>(elapsed * 4.0) % 2 != 0;
+            glDisable(GL_SCISSOR_TEST);
+            glClearColor(white ? 1.0f : 0.0f, white ? 1.0f : 0.0f, white ? 1.0f : 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            if (glGetError() != GL_NO_ERROR) {
+                std::printf("Interval %d: GL error during clear; phase stopped\n", interval);
+                phase_complete = false;
+                break;
+            }
+            const auto wall = std::chrono::system_clock::now();
+            if (!window->swap_buffers().is_ok()) {
+                std::printf("Interval %d: swap failed; phase stopped\n", interval);
+                phase_complete = false;
+                break;
+            }
+            if (now >= measurement_start) {
+                const double wall_seconds =
+                    std::chrono::duration<double>(wall.time_since_epoch()).count();
+                std::fprintf(csv.file, "%d,%llu,%.6f,%.6f,%s\n", interval, frames, wall_seconds,
+                             elapsed, white ? "white" : "black");
+                if (have_previous && white != previous_white) {
+                    ++changes;
+                }
+                have_previous = true;
+                previous_white = white;
+                ++frames;
+            }
+        }
+
+        window->pump_events(input);
+        const double measured =
+            std::chrono::duration<double>(Clock::now() - measurement_start).count();
+        CHECK(SDL_GetWindowFullscreenMode(native) != nullptr);
+        if (frames > 0 && measured > 0.0) {
+            std::printf("Interval %d: %llu submissions in %.3f s (%.1f/s), %llu background "
+                        "changes\n",
+                        interval, frames, measured, static_cast<double>(frames) / measured,
+                        changes);
+            measured_any = true;
+        } else if (phase_complete) {
+            std::printf("Interval %d: no submissions logged\n", interval);
+        }
+        std::fflush(csv.file);
+    }
+
+    // Restore the desktop before asserting, so a failed run does not leave the
+    // display in exclusive mode.
+    const bool left = peri::platform::detail::leave_test_fullscreen(*window);
+    window->pump_events(input);
+    CHECK(left);
+    std::printf("Left exclusive fullscreen. Timestamps are logged, but no capture was taken, so "
+                "physical VSync remains unverified.\n");
+    REQUIRE(measured_any);
 }
 
 TEST_CASE(window_opengl_context_smoke) {
