@@ -44,6 +44,13 @@ Last updated: 2026-11-25
   and compares it with the index it encoded, which adds one check per phase (25
   in a full four-phase run). Repeated read-backs were avoided because they would
   distort the pacing being measured.
+- clang-tidy is blocking in CI and had not been run locally since the
+  exclusive-fullscreen hook landed. Installed the pinned 22.1.8 build and ran
+  `tools/dev/ci_clang_tidy.sh build/windows-debug`: it rejected `SDL_free` on the
+  `SDL_DisplayMode**` returned by `SDL_GetFullscreenDisplayModes`
+  (`bugprone-multi-level-implicit-pointer-conversion`, treated as an error).
+  Fixed with an explicit `static_cast<void*>`; the check is now clean over all
+  nine engine sources, and the MSVC build and suite still pass.
 - Not run with the marker: it does not change what a run proves and no capture
   exists. It builds under MSVC Debug, the local suite passes and the case still
   skips without `PERI_TEST_OPENGL_ALTERNATION=1`; it is not enabled in CI. The

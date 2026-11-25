@@ -370,7 +370,7 @@ Result<TestExclusiveMode> enter_test_exclusive_fullscreen(Window& window, int wi
     SDL_DisplayMode** modes = SDL_GetFullscreenDisplayModes(display, &mode_count);
     if (modes == nullptr || mode_count <= 0) {
         if (modes != nullptr) {
-            SDL_free(modes);
+            SDL_free(static_cast<void*>(modes));
         }
         return Error{ErrorCode::unsupported, "display reports no fullscreen modes"};
     }
@@ -396,7 +396,7 @@ Result<TestExclusiveMode> enter_test_exclusive_fullscreen(Window& window, int wi
         requested_mode = *best;
     }
     const bool found = best != nullptr;
-    SDL_free(modes);
+    SDL_free(static_cast<void*>(modes));
     if (!found) {
         return Error{ErrorCode::unsupported, "no fullscreen mode matches the window size"};
     }

@@ -63,7 +63,7 @@ Sizes are planning aids for a solo developer working part-time, not commitments.
 | 1.6 | File system basics: UTF-8 paths, base path discovery, read/write directory creation, atomic file replace | P0 | Used by saves and assets later. |
 | 1.7 | Logging sink to console + rotating file; crash-safe flush policy | P1 | No hot-path formatting cost when disabled. |
 | 1.8 | Frame stats overlay (text-only, no font dependency yet) and CSV frame log | P1 | Needed for benchmark M1 gate. |
-| 1.9 | Physical-VSync evidence run: compositor-free fullscreen, external capture, interval controls | P0 | Method below; opt-in `window_opengl_alternation_manual` supplies the mode, refresh read-back and timestamp log; the capture stays manual. Archive in `benchmarks/results/`. |
+| 1.9 | Physical-VSync evidence run: compositor-free fullscreen, external capture, interval controls | P0 | Method below; opt-in `window_opengl_alternation_manual` supplies the mode, refresh read-back, timestamp log and a decodable frame marker; the capture stays manual. Archive in `benchmarks/results/`. |
 
 **Exit criteria**
 - Same binary behavior on Windows and Linux: window, resize, fullscreen, focus loss, clean exit.
