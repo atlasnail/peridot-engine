@@ -14,26 +14,54 @@ Last updated: 2026-11-25
   (`peri::SdlSession`), so shutdown is deterministic. The opt-in GL context
   and swap-control groundwork exists, but clear, desktop and hardware checks,
   and a real CPU-time measurement remain open.
-- **Physical-VSync evidence:** four exclusive-fullscreen runs pace interval 1
+- **Physical-VSync evidence:** five exclusive-fullscreen runs pace interval 1
   within 0.1 % of a read-back 60 Hz mode, including an interval-1 repeat after
-  the 0/2 controls, but the first run's bimodal spacing never recurred and no
-  capture exists, so physical VSync is unverified and M1 stays open.
+  the 0/2 controls and a run whose frame marker decoded correctly, but the first
+  run's bimodal spacing never recurred and no capture exists, so physical VSync
+  is unverified and M1 stays open.
 - Version `0.1.0-dev`; implementation: core and SDL3 platform, tests and
   `bench_blank`. No game renderer or audio.
 - The existing remote is `https://github.com/atlasnail/engine.git`. The rename
   passed Linux CI using SDL's dummy video driver, but has not been verified on
   a real Linux display or gamepad.
 
-## Latest session: M1 alternation frame marker
+## Latest session: M1 marker run
+
+- Ran the marker-enabled diagnostic once on 2026-11-25 with approval: Windows 11
+  Pro 10.0.26200, MSVC Debug, `24N5C` read back as `60/1` = 60.0000 Hz, desktop
+  back at 1920x1080 afterwards. Exit 0, 25 checks, none failed, so all four
+  per-phase marker read-backs matched the index they encoded. CSV:
+  `benchmarks/results/windows-alternation-2026-11-25-marker.csv`.
+- Rates: interval 1 at 60.00/s (median 16.672 ms), interval 2 at 30.00/s
+  (33.344 ms), the interval-1 repeat at 60.00/s (16.673 ms), and interval 0 at
+  1697.13/s (0.322 ms), down from 4516-4845/s in the earlier runs. The marker
+  adds nine scissored clears per frame on top of the full-screen clear, which
+  only bites at unthrottled rates; the throttled phases are unmoved.
+- The logged `submission` is the phase-wide index the marker shows: it starts at
+  24 after the warm-up and the run ends at 267. An interval-1 phase is 240
+  submissions, so its eight-bit patterns never repeat inside one phase; the
+  unthrottled phase wraps constantly and is not decodable, which is expected.
+- Wall and steady spans differ by 35 ms here because `wall_seconds` is taken
+  after the swap returns and the first logged swap blocked, so per-row
+  `wall_seconds` is the alignment key, not the span of a phase.
+- Checks around this run: MSVC Debug and Clang Debug both build under warnings
+  as errors and pass CTest, and the pinned clang-tidy 22.1.8 script is clean
+  over the engine sources.
+- Physical VSync is still unclaimed: no capture exists, the panel was not
+  measured and nothing observed a displayed frame. The marker makes the capture
+  cheaper to analyse, not the claim stronger, and M1 stays open.
+
+## Previous session: M1 alternation frame marker
 
 - Added a coarse visual frame marker to `window_opengl_alternation_manual` so a
   240 fps capture can name the submission each captured frame shows instead of
   matching wall clocks. Every frame draws a grey band across the top eighth of
   the screen, then eight blocks carrying the low bits of the phase-wide
-  submission index: leftmost block is bit 0, white is 1, black is 0. The index
-  repeats every 256 submissions, 4.3 s at 60 Hz, longer than a phase, so no
-  pattern recurs within one measurement. It costs nine scissored clears per
-  frame, no allocation and no render path.
+  submission index: leftmost block is bit 0, white is 1, black is 0. Patterns
+  repeat every 256 submissions, so a 240-submission interval-1 phase or a
+  120-submission interval-2 phase cannot repeat one, while the unthrottled phase
+  wraps by design. It costs nine scissored clears per frame, no allocation and no
+  render path.
 - The CSV `submission` column is now that phase-wide index, so a decoded pattern
   maps to a row directly. Rows are still written only inside the measured 4 s
   window, so the first row starts after the warm-up count rather than at 0; the
